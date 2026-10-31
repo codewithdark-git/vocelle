@@ -5,170 +5,182 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vocelle: offline voice typing for Windows</title>
   <meta name="description" content="Hold Right Ctrl, say it, release. Vocelle types your words into any app on Windows, transcribed offline on your own PC.">
-  <meta name="theme-color" content="#070A1A">
+  <meta name="theme-color" content="#FF5A1F">
   <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Vocelle: the end of prompting">
-  <meta property="og:description" content="Hold Right Ctrl, say it, release. Offline voice typing for Windows.">
+  <meta property="og:title" content="Vocelle: hold a key, say it, it's typed">
+  <meta property="og:description" content="Offline voice typing for Windows. Your voice stays on your PC.">
   <meta property="og:image" content="https://codewithdark-git.github.io/vocelle-site/assets/demo-poster.jpg">
   <meta name="twitter:card" content="summary_large_image">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,400..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
       <a class="brand" href="#top" aria-label="Vocelle home">
-        <img src="assets/logo-mark.svg" alt="" width="30" height="30">
+        <img src="assets/logo-mark.svg" alt="" width="34" height="34">
         <span>Vocelle</span>
       </a>
       <nav class="nav-links" aria-label="Main">
         <a href="#how">How it works</a>
         <a href="#features">Features</a>
         <a href="#requirements">Requirements</a>
-        <a href="#faq">FAQ</a>
+        <a href="#faq">Questions</a>
       </nav>
-      <a class="btn btn-small js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">Download</a>
+      <a class="btn btn-ink btn-small js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">Download</a>
     </div>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="wrap hero-inner">
-        <p class="eyebrow mono">Voice typing for Windows</p>
-        <h1>The end of <span class="strike">prompting</span>.<br><span class="accent">Just say it.</span></h1>
-        <p class="lede">Hold <kbd>Right Ctrl</kbd>, speak, release. Vocelle types your words into whatever app you're in, transcribed offline on your own PC.</p>
-        <div class="cta">
-          <a class="btn btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">
-            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 5.5 10.5 4.4v7.1H3V5.5Zm0 13 7.5 1.1v-7H3v5.9Zm8.4 1.2L21 21v-8.4h-9.6v7.1Zm0-15.4v7.2H21V3l-9.6 1.3Z"/></svg>
-            Download for Windows
-          </a>
-          <p class="cta-meta mono"><span class="js-version">v0.1.0</span> · <span class="js-size">2.0 MB</span> · Windows 10 &amp; 11, 64-bit</p>
+        <div class="hero-copy">
+          <h1><span>Hold a key.</span> <span>Say it.</span> <span>It's typed.</span></h1>
+          <p class="lede">Vocelle turns your voice into text in any app on Windows. Speech recognition runs offline, on your own PC, so nothing you say leaves it.</p>
+          <div class="cta">
+            <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">Download for Windows</a>
+            <p class="cta-meta">Version <span class="js-version">0.1.0</span>, <span class="js-size">2.0 MB</span>.<br>Windows 10 and 11, 64-bit.</p>
+          </div>
         </div>
-      </div>
 
-      <div class="wrap">
-        <figure class="demo">
-          <video src="assets/demo.mp4" poster="assets/demo-poster.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Demo: a long prompt is wiped away, Right Ctrl is pressed, and a spoken sentence is typed on screen."></video>
-        </figure>
+        <div class="try" aria-label="Try the talk key">
+          <div class="try-field" aria-live="polite">
+            <span class="try-text js-try-text"></span><span class="caret" aria-hidden="true"></span>
+            <span class="try-hint js-try-hint">Your words will appear here.</span>
+          </div>
+          <div class="wave js-wave" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="try-controls">
+            <button class="keycap js-key" type="button" aria-describedby="try-status">Right Ctrl</button>
+            <p id="try-status" class="try-status js-status">Hold the key to try it, then let go.</p>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section id="how" class="section">
+    <section class="film">
       <div class="wrap">
-        <p class="eyebrow mono">How it works</p>
-        <h2>Three steps. No prompt engineering.</h2>
+        <video src="assets/demo.mp4" poster="assets/demo-poster.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Demo: a long prompt is wiped away, Right Ctrl is pressed, and a spoken sentence is typed on screen."></video>
+        <p class="film-caption">Long prompts were a workaround. Talking is the interface you already know.</p>
+      </div>
+    </section>
+
+    <section id="how" class="how">
+      <div class="wrap">
+        <h2>Three steps, every time</h2>
         <ol class="steps">
           <li>
-            <span class="step-num mono">01</span>
-            <h3>Hold <kbd>Right Ctrl</kbd></h3>
-            <p>Click into any text box first. A small indicator shows Vocelle is listening.</p>
+            <span class="step-num">1</span>
+            <h3>Hold Right Ctrl</h3>
+            <p>Click into any text box first. A small indicator at the bottom of the screen shows Vocelle is listening.</p>
           </li>
           <li>
-            <span class="step-num mono">02</span>
+            <span class="step-num">2</span>
             <h3>Say what you mean</h3>
-            <p>Talk the way you would to a person. Silence and background noise are skipped.</p>
+            <p>Talk the way you would to a person. Silence and background noise aren't typed.</p>
           </li>
           <li>
-            <span class="step-num mono">03</span>
-            <h3>Release</h3>
-            <p>Your words appear at the cursor. Your clipboard is put back as it was.</p>
+            <span class="step-num">3</span>
+            <h3>Let go</h3>
+            <p>Your words appear at the cursor, and whatever was on your clipboard is put back.</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <section id="features" class="section section-alt">
-      <div class="wrap">
-        <p class="eyebrow mono">Why Vocelle</p>
-        <h2>Spend your words on the work, <span class="accent">not the prompt.</span></h2>
-        <div class="grid">
-          <article class="card">
-            <h3>Works offline</h3>
-            <p>Speech recognition runs on your PC with open-source Whisper models. No internet needed after the model download.</p>
-          </article>
-          <article class="card">
-            <h3>Private by design</h3>
-            <p>Audio is processed in memory and never leaves your computer. No account, no analytics, no telemetry.</p>
-          </article>
-          <article class="card">
-            <h3>Types anywhere</h3>
-            <p>Word, Chrome, Slack, Teams, VS Code, Notepad: if it has a text cursor, Vocelle can type into it.</p>
-          </article>
-          <article class="card">
-            <h3>Stays out of the way</h3>
-            <p>A small tray app with a floating indicator that never steals focus from what you're doing.</p>
-          </article>
-          <article class="card">
-            <h3>A model for every PC</h3>
-            <p>Six models from Tiny (78 MB) to Large Turbo (574 MB). Vocelle recommends the right one for your hardware.</p>
-          </article>
-          <article class="card">
-            <h3>Verified downloads</h3>
-            <p>Models come from the official whisper.cpp repositories and are checked with SHA-256 before use.</p>
-          </article>
-        </div>
+    <section id="features" class="features">
+      <div class="wrap features-inner">
+        <h2>Spend your words on the work, not the prompt.</h2>
+        <dl class="feature-list">
+          <div>
+            <dt>Works offline</dt>
+            <dd>Open-source Whisper models run on your PC. After the one-time model download, you don't need an internet connection.</dd>
+          </div>
+          <div>
+            <dt>Private by design</dt>
+            <dd>Audio is processed in memory and never saved or sent anywhere. No account, analytics or telemetry.</dd>
+          </div>
+          <div>
+            <dt>Types into any app</dt>
+            <dd>Word, Chrome, Slack, Teams, VS Code, Notepad. If it has a text cursor, Vocelle can type into it.</dd>
+          </div>
+          <div>
+            <dt>Stays out of your way</dt>
+            <dd>It lives in the system tray, and its indicator never takes focus from the window you're typing in.</dd>
+          </div>
+          <div>
+            <dt>Sized for your PC</dt>
+            <dd>Choose from six models, from Tiny (78 MB) to Large Turbo (574 MB). Vocelle recommends one for your hardware.</dd>
+          </div>
+          <div>
+            <dt>Checked downloads</dt>
+            <dd>Models come from the official whisper.cpp repositories and are verified with SHA-256 before use.</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
-    <section id="requirements" class="section">
-      <div class="wrap split">
+    <section id="requirements" class="reqs">
+      <div class="wrap reqs-inner">
         <div>
-          <p class="eyebrow mono">Requirements</p>
-          <h2>Built for Windows.</h2>
+          <h2>What you need</h2>
           <ul class="checklist">
-            <li>Windows 10 (1903 or later) or Windows 11, 64-bit</li>
-            <li>A CPU with AVX2: Intel 4th gen (2013) or newer, AMD Ryzen or newer</li>
-            <li>4 GB RAM (8 GB recommended for larger models)</li>
+            <li>Windows 10 (version 1903 or later) or Windows 11, 64-bit</li>
+            <li>A CPU with AVX2: Intel 4th generation (2013) or newer, or AMD Ryzen</li>
+            <li>4 GB of RAM, or 8 GB for the larger models</li>
             <li>A microphone</li>
             <li>About 200 MB of disk space with a small model</li>
           </ul>
         </div>
-        <div class="note">
-          <h3>First install</h3>
-          <p>The installer isn't code-signed yet, so Windows may show <em>"Windows protected your PC"</em>. Click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
-          <p>Vocelle starts in the system tray. Open Settings, download the model marked <em>Recommended</em>, and you're ready.</p>
+        <aside class="note">
+          <h3>Installing for the first time</h3>
+          <p>The installer isn't code-signed yet, so Windows may say <em>"Windows protected your PC"</em>. Click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+          <p>Vocelle opens in the system tray. Open Settings, download the model marked <em>Recommended</em>, and you're ready to talk.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <div class="wrap faq-inner">
+        <h2>Questions</h2>
+        <div class="faq-list">
+          <details>
+            <summary>Does Vocelle send my voice to the cloud?</summary>
+            <p>No. Transcription runs entirely on your PC. The only network requests Vocelle makes are the model downloads you start in Settings.</p>
+          </details>
+          <details>
+            <summary>Which languages does it understand?</summary>
+            <p>The English-only models are the fastest and most accurate for English. The multilingual models cover 99 languages.</p>
+          </details>
+          <details>
+            <summary>Can I change the talk key?</summary>
+            <p>Not yet. The talk key is Right Ctrl in this release, and a configurable key is planned for the next one.</p>
+          </details>
+          <details>
+            <summary>Nothing happens when I hold Right Ctrl.</summary>
+            <p>Check that Vocelle is running in the tray and that a model shows <em>ready</em> in Settings. Some keyboards and remote-desktop tools remap Right Ctrl.</p>
+          </details>
+          <details>
+            <summary>How do I uninstall it?</summary>
+            <p>Open Windows Settings, go to Apps, then Installed apps, find Vocelle and choose Uninstall.</p>
+          </details>
         </div>
       </div>
     </section>
 
-    <section id="faq" class="section section-alt">
-      <div class="wrap narrow">
-        <p class="eyebrow mono">FAQ</p>
-        <h2>Questions</h2>
-        <details>
-          <summary>Does Vocelle send my voice to the cloud?</summary>
-          <p>No. Transcription runs entirely on your PC. The only network requests Vocelle makes are the model downloads you start in Settings.</p>
-        </details>
-        <details>
-          <summary>Which languages does it support?</summary>
-          <p>English-only models are the fastest and most accurate for English. The multilingual models cover 99 languages.</p>
-        </details>
-        <details>
-          <summary>Can I change the talk key?</summary>
-          <p>Not yet. The talk key is Right Ctrl in this release; a configurable key is planned for the next one.</p>
-        </details>
-        <details>
-          <summary>Nothing happens when I hold Right Ctrl.</summary>
-          <p>Check that Vocelle is running in the tray and that a model shows <em>ready</em> in Settings. Some keyboards and remote-desktop tools remap Right Ctrl.</p>
-        </details>
-        <details>
-          <summary>How do I uninstall it?</summary>
-          <p>Windows Settings → Apps → Installed apps → Vocelle → Uninstall.</p>
-        </details>
-      </div>
-    </section>
-
-    <section class="section final">
+    <section class="final">
       <div class="wrap final-inner">
-        <img src="assets/logo-mark.svg" alt="" width="64" height="64">
         <h2>Just say it.</h2>
-        <a class="btn btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">Download for Windows</a>
-        <p class="cta-meta mono"><span class="js-version">v0.1.0</span> · early preview · no account needed</p>
+        <div class="cta">
+          <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.1.0/Vocelle_0.1.0_x64-setup.exe">Download for Windows</a>
+          <p class="cta-meta">Early preview. No account needed.</p>
+        </div>
       </div>
     </section>
   </main>
@@ -177,7 +189,7 @@
     <div class="wrap footer-inner">
       <span>© <span class="js-year">2026</span> Vocelle</span>
       <nav aria-label="Footer">
-        <a href="https://github.com/codewithdark-git/vocelle">GitHub</a>
+        <a href="https://github.com/codewithdark-git/vocelle">Source on GitHub</a>
         <a href="https://github.com/codewithdark-git/vocelle/blob/main/CHANGELOG.md">Changelog</a>
         <a href="https://github.com/codewithdark-git/vocelle/releases">All releases</a>
       </nav>
