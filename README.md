@@ -17,6 +17,8 @@
 <p align="center">
   <a href="https://github.com/codewithdark-git/vocelle/releases/latest"><b>Download for Windows</b></a>
   ·
+  <a href="https://codewithdark-git.github.io/vocelle/">Website</a>
+  ·
   <a href="#quick-start">Quick start</a>
   ·
   <a href="#troubleshooting">Troubleshooting</a>
@@ -208,6 +210,7 @@ src-tauri/src/
   settings.rs         settings.json
   tray.rs             Tray icon and menu
 assets/               Logo files
+site/                 Website (static HTML, deployed to GitHub Pages)
 docs/RELEASING.md     How releases are versioned and published
 ```
 </details>
