@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" role="img" aria-label="Vocelle">
+  <title>Vocelle</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4C6EF5"/>
+      <stop offset="1" stop-color="#7048E8"/>
+    </linearGradient>
+    <clipPath id="typed">
+      <rect class="reveal" x="252" y="20" width="560" height="200"/>
+    </clipPath>
+  </defs>
+  <style>
+    .word { fill: #1B1B1F; font: 700 120px "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif; }
+    .caret { fill: #5C7CFA; }
+    @media (prefers-color-scheme: dark) {
+      .word { fill: #F2F2F5; }
+      .caret { fill: #91A7FF; }
+    }
+
+    /* Bars move like a voice level meter. */
+    .bar { transform-box: fill-box; transform-origin: center; animation: talk 1.1s ease-in-out infinite alternate; }
+    .b2 { animation-delay: -0.35s; }
+    .b3 { animation-delay: -0.7s; }
+    .b4 { animation-delay: -0.2s; }
+    .b5 { animation-delay: -0.55s; }
+    @keyframes talk { from { transform: scaleY(0.45); } to { transform: scaleY(1); } }
+
+    /* The word types itself out, one letter per step, then holds. */
+    .reveal { animation: type 7s step-end infinite; }
+    .caret { animation: follow 7s step-end infinite, blink 1s steps(2, jump-none) infinite; }
+    /* One step per letter, so each frame shows whole letters. */
+    @keyframes type {
+      0%, 10% { width: 0px; }
+      13.4% { width: 110px; }
+      16.9% { width: 210px; }
+      20.3% { width: 290px; }
+      23.7% { width: 380px; }
+      27.1% { width: 424px; }
+      30.6% { width: 468px; }
+      34%, 100% { width: 560px; }
+    }
+    @keyframes follow {
+      0%, 10% { transform: translateX(0px); }
+      13.4% { transform: translateX(110px); }
+      16.9% { transform: translateX(210px); }
+      20.3% { transform: translateX(290px); }
+      23.7% { transform: translateX(380px); }
+      27.1% { transform: translateX(424px); }
+      30.6% { transform: translateX(468px); }
+      34%, 100% { transform: translateX(560px); }
+    }
+    @keyframes blink { from { opacity: 1; } to { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bar, .reveal, .caret { animation: none; }
+      .reveal { width: 560px; }
+      .caret { transform: translateX(560px); }
+    }
+  </style>
+
+  <g transform="translate(24 24) scale(0.375)">
+    <rect width="512" height="512" rx="116" fill="url(#tile)"/>
+    <g fill="#FFFFFF">
+      <rect class="bar b1" x="86"  y="196" width="44" height="120" rx="22"/>
+      <rect class="bar b2" x="160" y="141" width="44" height="230" rx="22"/>
+      <rect class="bar b3" x="234" y="91"  width="44" height="330" rx="22"/>
+      <rect class="bar b4" x="308" y="141" width="44" height="230" rx="22"/>
+      <rect class="bar b5" x="382" y="196" width="44" height="120" rx="22" opacity="0.85"/>
+    </g>
+  </g>
+
+  <text class="word" x="256" y="162" textLength="552" lengthAdjust="spacingAndGlyphs" clip-path="url(#typed)">Vocelle</text>
+  <rect class="caret" x="264" y="62" width="10" height="116" rx="5"/>
+</svg>
