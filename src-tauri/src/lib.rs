@@ -3,7 +3,10 @@ mod audio;
 mod dictation;
 mod hotkey;
 mod insert;
+mod models;
 mod overlay;
+mod settings;
+mod speech;
 mod tray;
 
 use serde::Serialize;
@@ -39,10 +42,13 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        .manage(asr::Engine::default())
+        .manage(speech::Downloads::default())
         .setup(|app| {
             tray::create(app.handle())?;
             overlay::init(app.handle());
             dictation::start(app.handle().clone())?;
+            speech::load_selected(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -54,7 +60,12 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            speech::list_models,
+            speech::download_model,
+            speech::select_model,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Vocelle");
 }

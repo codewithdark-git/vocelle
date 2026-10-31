@@ -8,10 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::{
-    asr,
+    asr::Engine,
     audio::Recording,
     hotkey::{self, HotkeyEvent},
     insert,
@@ -87,10 +87,19 @@ fn finish(app: &AppHandle, rec: Recording) -> Instant {
     overlay::set_status(app, Phase::Transcribing, None);
     let samples = rec.finish();
 
-    let text = match asr::transcribe(&samples) {
+    let text = match app.state::<Engine>().transcribe(&samples) {
         Ok(text) => text,
-        Err(message) => return show_error(app, message),
+        Err(message) => {
+            if app.state::<Engine>().loaded_model().is_none() {
+                crate::show_main_window(app);
+            }
+            return show_error(app, message);
+        }
     };
+    if text.trim().is_empty() {
+        overlay::set_status(app, Phase::Done, Some("No speech heard".into()));
+        return Instant::now() + DONE_LINGER;
+    }
     if let Err(err) = insert::insert_text(text.trim()) {
         return show_error(app, err.to_string());
     }
