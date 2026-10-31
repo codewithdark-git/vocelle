@@ -60,7 +60,9 @@ fn run(app: AppHandle, rx: Receiver<HotkeyEvent>) {
                 }
             }
             Ok(HotkeyEvent::Released) => {
-                let Some((rec, started)) = recording.take() else { continue };
+                let Some((rec, started)) = recording.take() else {
+                    continue;
+                };
                 if started.elapsed() < MIN_HOLD {
                     drop(rec);
                     overlay::hide(&app);

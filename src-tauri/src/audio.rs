@@ -175,7 +175,10 @@ mod tests {
     #[test]
     fn resample_keeps_duration() {
         let one_second_48k = vec![0.0; 48_000];
-        assert_eq!(resample_linear(&one_second_48k, 48_000, 16_000).len(), 16_000);
+        assert_eq!(
+            resample_linear(&one_second_48k, 48_000, 16_000).len(),
+            16_000
+        );
     }
 
     #[test]

@@ -76,9 +76,15 @@ impl Engine {
         }
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+        let threads = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .min(8);
         params.set_n_threads(threads as i32);
-        params.set_language(Some(if loaded.model.english_only { "en" } else { "auto" }));
+        params.set_language(Some(if loaded.model.english_only {
+            "en"
+        } else {
+            "auto"
+        }));
         params.set_audio_ctx(audio_ctx(audio.len()));
         params.set_no_context(true);
         params.set_no_timestamps(true);
@@ -166,7 +172,11 @@ mod tests {
     #[ignore = "needs a downloaded model and WAV files"]
     fn transcribe_wav_files() {
         let model_path = std::env::var("VOCELLE_TEST_MODEL").expect("set VOCELLE_TEST_MODEL");
-        let file = Path::new(&model_path).file_name().unwrap().to_str().unwrap();
+        let file = Path::new(&model_path)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
         let model = crate::models::CATALOG
             .iter()
             .find(|m| m.file == file)
@@ -181,7 +191,11 @@ mod tests {
         for wav in wavs.split(';') {
             let mut reader = hound::WavReader::open(wav).unwrap();
             let spec = reader.spec();
-            assert_eq!((spec.sample_rate, spec.channels), (TARGET_RATE, 1), "{wav}: need 16 kHz mono");
+            assert_eq!(
+                (spec.sample_rate, spec.channels),
+                (TARGET_RATE, 1),
+                "{wav}: need 16 kHz mono"
+            );
             let samples: Vec<f32> = reader
                 .samples::<i16>()
                 .map(|s| s.unwrap() as f32 / i16::MAX as f32)

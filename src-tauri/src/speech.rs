@@ -107,7 +107,13 @@ pub fn download_model(
         if error.is_none() && settings::load(&app).model.is_none() {
             let _ = select(&app, model);
         }
-        let _ = app.emit("model-downloaded", ModelEvent { id: model.id, error });
+        let _ = app.emit(
+            "model-downloaded",
+            ModelEvent {
+                id: model.id,
+                error,
+            },
+        );
     });
     Ok(())
 }

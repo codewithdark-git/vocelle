@@ -39,7 +39,10 @@ macro_rules! whisper_model {
             english_only: $en,
             size_bytes: $size,
             file: $file,
-            url: concat!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/", $file),
+            url: concat!(
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/",
+                $file
+            ),
             sha256: $sha,
         }
     };
@@ -48,33 +51,57 @@ macro_rules! whisper_model {
 /// Ordered from fastest to most accurate.
 pub const CATALOG: &[ModelInfo] = &[
     whisper_model!(
-        "tiny.en", "Tiny (English)", "Fastest. Fine for short, clear phrases on older PCs.",
-        true, "ggml-tiny.en.bin", 77_704_715,
+        "tiny.en",
+        "Tiny (English)",
+        "Fastest. Fine for short, clear phrases on older PCs.",
+        true,
+        "ggml-tiny.en.bin",
+        77_704_715,
         "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f"
     ),
     whisper_model!(
-        "base.en", "Base (English)", "Fast and good for everyday dictation on most laptops.",
-        true, "ggml-base.en.bin", 147_964_211,
+        "base.en",
+        "Base (English)",
+        "Fast and good for everyday dictation on most laptops.",
+        true,
+        "ggml-base.en.bin",
+        147_964_211,
         "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
     ),
     whisper_model!(
-        "base", "Base (multilingual)", "Like Base, for 99 languages.",
-        false, "ggml-base.bin", 147_951_465,
+        "base",
+        "Base (multilingual)",
+        "Like Base, for 99 languages.",
+        false,
+        "ggml-base.bin",
+        147_951_465,
         "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
     ),
     whisper_model!(
-        "small.en-q5_1", "Small (English)", "More accurate; needs a recent 4+ core CPU.",
-        true, "ggml-small.en-q5_1.bin", 190_098_681,
+        "small.en-q5_1",
+        "Small (English)",
+        "More accurate; needs a recent 4+ core CPU.",
+        true,
+        "ggml-small.en-q5_1.bin",
+        190_098_681,
         "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30"
     ),
     whisper_model!(
-        "small-q5_1", "Small (multilingual)", "Like Small, for 99 languages.",
-        false, "ggml-small-q5_1.bin", 190_085_487,
+        "small-q5_1",
+        "Small (multilingual)",
+        "Like Small, for 99 languages.",
+        false,
+        "ggml-small-q5_1.bin",
+        190_085_487,
         "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
     ),
     whisper_model!(
-        "large-v3-turbo-q5_0", "Large Turbo", "Best accuracy, multilingual. Best with a GPU or 8+ core CPU.",
-        false, "ggml-large-v3-turbo-q5_0.bin", 574_041_195,
+        "large-v3-turbo-q5_0",
+        "Large Turbo",
+        "Best accuracy, multilingual. Best with a GPU or 8+ core CPU.",
+        false,
+        "ggml-large-v3-turbo-q5_0.bin",
+        574_041_195,
         "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"
     ),
 ];
