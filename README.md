@@ -25,6 +25,10 @@ npm install
 npm run tauri dev
 ```
 
+Hold **Right Ctrl** to dictate. Until the speech engine lands, the app pastes a placeholder like `[Vocelle test: heard 1.6 s of audio]`.
+
+For automated tests, a debug build started with `VOCELLE_TEST_INJECTED_KEYS=1` accepts a talk key sent with `SendInput` (release builds always ignore injected keys).
+
 Build an installer:
 
 ```bash

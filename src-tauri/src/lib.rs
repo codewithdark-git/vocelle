@@ -1,3 +1,9 @@
+mod asr;
+mod audio;
+mod dictation;
+mod hotkey;
+mod insert;
+mod overlay;
 mod tray;
 
 use serde::Serialize;
@@ -35,6 +41,8 @@ pub fn run() {
         }))
         .setup(|app| {
             tray::create(app.handle())?;
+            overlay::init(app.handle());
+            dictation::start(app.handle().clone())?;
             Ok(())
         })
         .on_window_event(|window, event| {
