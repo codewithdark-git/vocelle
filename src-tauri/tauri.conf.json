@@ -54,7 +54,18 @@
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
       }
-    }
+    },
+    "publisher": "codewithdark-git",
+    "copyright": "Copyright (c) 2026 codewithdark-git. All rights reserved.",
+    "category": "Productivity",
+    "shortDescription": "Private, offline voice dictation for Windows",
+    "longDescription": "Hold a key, speak, and your words appear in any app, transcribed on your own PC with open-source Whisper models.",
+    "homepage": "https://github.com/codewithdark-git/vocelle",
+    "licenseFile": "../LICENSE"
   }
 }
