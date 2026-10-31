@@ -5,3 +5,6 @@ src-tauri/gen/
 docs/research/media/
 .remember/
 *.log
+
+# Private planning and research; never pushed.
+internal/
