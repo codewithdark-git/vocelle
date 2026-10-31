@@ -11,5 +11,12 @@ export default defineConfig({
   build: {
     target: "es2022",
     outDir: "dist",
+    rollupOptions: {
+      // One page per Tauri window.
+      input: {
+        main: "index.html",
+        overlay: "overlay.html",
+      },
+    },
   },
 });

@@ -19,6 +19,21 @@
         "minWidth": 480,
         "minHeight": 360,
         "visible": true
+      },
+      {
+        "label": "overlay",
+        "url": "overlay.html",
+        "title": "Vocelle overlay",
+        "width": 220,
+        "height": 56,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false
       }
     ],
     "security": {
@@ -27,7 +42,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,7 +52,9 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     }
   }
 }
