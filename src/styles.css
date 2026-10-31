@@ -4,6 +4,9 @@
   --muted: #5d5d66;
   --card: #ffffff;
   --border: #e2e2e6;
+  --accent: #3b5bdb;
+  --accent-soft: #e7ecff;
+  --error: #c92a2a;
   color-scheme: light dark;
   font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
 }
@@ -15,6 +18,9 @@
     --muted: #a0a0aa;
     --card: #26262a;
     --border: #36363c;
+    --accent: #8ca2ff;
+    --accent-soft: #2a3150;
+    --error: #ff8787;
   }
 }
 
@@ -51,3 +57,53 @@ dl {
 
 dt { color: var(--muted); }
 dd { margin: 0; }
+
+.small { font-size: 0.85rem; }
+
+.models {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.model-name { font-weight: 600; }
+
+.model-action {
+  flex: none;
+  min-width: 96px;
+  text-align: right;
+}
+
+.model-action progress { width: 96px; }
+
+.tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+button {
+  font: inherit;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--accent); }
+
+.error { color: var(--error); }

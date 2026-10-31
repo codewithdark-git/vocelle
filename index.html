@@ -14,9 +14,15 @@
         <h2>Status</h2>
         <dl>
           <dt>Version</dt><dd id="version">…</dd>
-          <dt>Speech engine</dt><dd>Not installed yet</dd>
-          <dt>Hotkey</dt><dd>Not set up yet</dd>
+          <dt>Speech model</dt><dd id="engine-status">Checking…</dd>
+          <dt>Talk key</dt><dd>Hold Right Ctrl</dd>
         </dl>
+      </section>
+      <section class="card">
+        <h2>Speech models</h2>
+        <p class="muted small">Models run on this PC. Nothing you say is sent anywhere. Bigger models are more accurate but slower.</p>
+        <ul class="models" id="models"></ul>
+        <p class="error" id="models-error" hidden></p>
       </section>
       <p class="muted">Closing this window keeps Vocelle running in the tray. Use the tray menu to quit.</p>
     </main>
