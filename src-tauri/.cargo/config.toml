@@ -1,0 +1,5 @@
+[env]
+# whisper-rs generates its C bindings with libclang. Its bundled fallback
+# bindings were made on Linux and don't match Windows struct layouts.
+# Install LLVM (winget install LLVM.LLVM) or point this at your own copy.
+LIBCLANG_PATH = { value = 'C:/Program Files/LLVM/bin', force = false }
