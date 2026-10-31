@@ -3,3 +3,12 @@
 # bindings were made on Linux and don't match Windows struct layouts.
 # Install LLVM (winget install LLVM.LLVM) or point this at your own copy.
 LIBCLANG_PATH = { value = 'C:/Program Files/LLVM/bin', force = false }
+
+# Build whisper.cpp for a fixed CPU baseline instead of the build machine's CPU,
+# so release installers run the same everywhere. AVX2 + FMA + F16C covers
+# Intel Haswell (2013) / AMD Excavator (2015) and newer.
+GGML_NATIVE = "OFF"
+GGML_AVX = "ON"
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"
