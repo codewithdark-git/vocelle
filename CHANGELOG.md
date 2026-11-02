@@ -6,6 +6,70 @@ All notable changes to Vocelle are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+Faster dictation, a new look in the Vocelle brand colours, and a guided
+first run.
+
+### Added
+
+- **Welcome setup** on first launch: check your microphone, download the
+  model recommended for your computer, pick your talk key and try a
+  dictation. Skip it any time, or run it again from General → Setup guide.
+- **Home page**, shown first: words dictated, time saved compared with
+  typing, and your recent dictations grouped by day, with Copy and Delete.
+  It replaces the History tab.
+- **Transcribing ahead**: while you hold the talk key, finished phrases are
+  transcribed in the background, so long dictations appear about as quickly
+  as short ones.
+
+### Changed
+
+- **Much faster transcription.** On a 2-core laptop, 3 seconds of speech now
+  takes about 0.7 s instead of 2.1 s with Base (English), and about 0.6 s with
+  Tiny (English). The first dictation after start-up is no longer slower than
+  the rest.
+- **Speed-first model advice**: Tiny (English) is now recommended on 2- and
+  4-core computers, Base (English) on 6–11 cores and Small (English) above
+  that. Your current model isn't changed.
+- **New floating indicator** without text: bars that move with your voice
+  while listening, a wave of dots while transcribing, then a check mark (or a
+  short dash when nothing was heard, or a red mark on errors). It's smaller
+  and sits just above the taskbar.
+- **Redesigned app** in the Vocelle brand colours from the website (ember
+  orange, apricot and umber), with a sidebar, clearer settings rows, switches
+  and a before/after cleanup preview. Light and dark mode follow Windows.
+- **Styled dropdowns** replace the long system lists. The talk key picker
+  shows every key at once as a compact grid (recommended keys first), and
+  all pickers work with the keyboard.
+- New logo and app icon in the brand colours.
+- The talk key responds right away even while the previous dictation is
+  still being typed, and dictations are always typed in the order spoken.
+- Installers are built with tauri-action 1.0 and the latest GitHub Actions.
+- The README has screenshots, an explanation of how dictation works, an
+  updating guide and a FAQ. New [developer guide](https://github.com/codewithdark-git/vocelle/blob/main/docs/DEVELOPMENT.md)
+  and [security policy](https://github.com/codewithdark-git/vocelle/blob/main/SECURITY.md).
+
+### Removed
+
+- **Toggle mode** (press to start, press again to stop). It was unreliable;
+  hold-to-talk is now the only mode. If you used toggle mode, Vocelle switches
+  to hold-to-talk with the same key.
+
+### Fixed
+
+- Whisper could repeat a short phrase several times on some recordings.
+- Pressing the talk key while a long dictation was still being transcribed
+  could be ignored.
+
+### Known limitations
+
+- The installer isn't code-signed yet, so Windows SmartScreen shows a warning.
+- Needs a CPU with AVX2 (Intel 2013+ or AMD 2015+).
+- Linux: the talk key needs an X11 session (Wayland doesn't allow global key
+  listening), and dictation doesn't appear in terminals, which paste with
+  Ctrl+Shift+V.
+
 ## [0.2.0] - 2026-11-02
 
 Cleaner text, your own talk key, and a first Linux preview.
@@ -86,6 +150,7 @@ transcribed entirely on your PC.
   dictating are cleared.
 - The talk key can't be changed yet.
 
-[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/codewithdark-git/vocelle/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codewithdark-git/vocelle/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/codewithdark-git/vocelle/releases/tag/v0.1.0
