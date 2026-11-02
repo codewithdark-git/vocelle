@@ -13,24 +13,14 @@ use crate::{
     keys,
 };
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TalkMode {
-    /// Record while the talk key is held down.
-    #[default]
-    Hold,
-    /// Press once to start, press again to stop.
-    Toggle,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// Unknown keys are ignored, so files from 0.2 with "talk_mode" still load.
 #[serde(default)]
 pub struct Settings {
     /// Catalog id of the speech model to use. `None` until the user picks or downloads one.
     pub model: Option<String>,
     /// `KeyboardEvent.code` of the talk key, e.g. "ControlRight".
     pub talk_key: String,
-    pub talk_mode: TalkMode,
     /// Input device name; `None` uses the system default microphone.
     pub microphone: Option<String>,
     /// "auto" or a language code such as "en" (ignored by English-only models).
@@ -42,6 +32,8 @@ pub struct Settings {
     pub dictionary: Vec<String>,
     pub replacements: Vec<Replacement>,
     pub history: bool,
+    /// Whether the welcome setup has been completed or skipped.
+    pub onboarded: bool,
 }
 
 impl Default for Settings {
@@ -49,7 +41,6 @@ impl Default for Settings {
         Self {
             model: None,
             talk_key: keys::DEFAULT.to_owned(),
-            talk_mode: TalkMode::default(),
             microphone: None,
             language: "auto".to_owned(),
             cleanup: cleanup::Level::default(),
@@ -57,6 +48,7 @@ impl Default for Settings {
             dictionary: Vec::new(),
             replacements: Vec::new(),
             history: true,
+            onboarded: false,
         }
     }
 }
@@ -168,6 +160,13 @@ mod tests {
         assert_eq!(s.talk_key, "ControlRight");
         assert!(s.trailing_space);
         assert!(s.history);
+    }
+
+    #[test]
+    fn toggle_mode_from_0_2_falls_back_to_hold() {
+        let s: Settings =
+            serde_json::from_str(r#"{ "talk_key": "F9", "talk_mode": "toggle" }"#).unwrap();
+        assert_eq!(s.talk_key, "F9");
     }
 
     #[test]

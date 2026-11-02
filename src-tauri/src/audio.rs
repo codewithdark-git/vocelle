@@ -4,9 +4,12 @@
 //! 16 kHz mono f32 that Whisper expects. A rolling input level is kept for the
 //! overlay meter.
 
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc, Mutex,
+use std::{
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, Mutex,
+    },
+    time::Instant,
 };
 
 use cpal::{
@@ -30,6 +33,7 @@ pub struct Recording {
     samples: Arc<Mutex<Vec<f32>>>,
     level: Arc<AtomicU32>,
     device_rate: u32,
+    started: Instant,
 }
 
 impl Recording {
@@ -102,12 +106,25 @@ impl Recording {
             samples,
             level,
             device_rate,
+            started: Instant::now(),
         })
     }
 
     /// Current input level, 0.0–1.0, for the meter.
     pub fn level(&self) -> f32 {
         f32::from_bits(self.level.load(Ordering::Relaxed))
+    }
+
+    /// The audio so far as 16 kHz mono, while recording continues.
+    pub fn snapshot(&self) -> Vec<f32> {
+        if let Some(mut samples) = test_audio() {
+            // Test audio arrives in real time, like a microphone.
+            let spoken = (self.started.elapsed().as_secs_f32() * TARGET_RATE as f32) as usize;
+            samples.truncate(spoken);
+            return samples;
+        }
+        let raw = self.samples.lock().unwrap().clone();
+        resample_linear(&raw, self.device_rate, TARGET_RATE)
     }
 
     /// Stops recording and returns 16 kHz mono samples.
