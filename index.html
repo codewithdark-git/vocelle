@@ -7,24 +7,154 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
+    <header class="app-header">
+      <div class="brand">
+        <img src="/assets/logo-mark.svg" alt="" width="28" height="28" />
+        <span>Vocelle</span>
+        <span class="muted small" id="version"></span>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Settings sections">
+        <button role="tab" data-tab="general" aria-selected="true">General</button>
+        <button role="tab" data-tab="text" aria-selected="false">Text</button>
+        <button role="tab" data-tab="models" aria-selected="false">Models</button>
+        <button role="tab" data-tab="history" aria-selected="false">History</button>
+      </nav>
+      <span class="save-state small muted" id="save-state" aria-live="polite"></span>
+    </header>
+
     <main>
-      <h1>Vocelle</h1>
-      <p class="muted">Local voice dictation for Windows.</p>
-      <section class="card">
-        <h2>Status</h2>
-        <dl>
-          <dt>Version</dt><dd id="version">…</dd>
-          <dt>Speech model</dt><dd id="engine-status">Checking…</dd>
-          <dt>Talk key</dt><dd>Hold Right Ctrl</dd>
-        </dl>
+      <p class="error" id="error" hidden></p>
+
+      <!-- General -->
+      <section class="page" id="page-general" role="tabpanel">
+        <div class="card status">
+          <div>
+            <div class="muted small">Speech model</div>
+            <div id="engine-status">Checking…</div>
+          </div>
+          <div>
+            <div class="muted small">To dictate</div>
+            <div id="howto">…</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Talk key</h2>
+          <div class="row">
+            <label for="talk-key">Key</label>
+            <div class="inline">
+              <select id="talk-key"></select>
+              <button id="capture-key" type="button">Press a key…</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">Mode</span>
+            <div class="choice-group" role="radiogroup" aria-label="Talk mode">
+              <label class="choice">
+                <input type="radio" name="talk-mode" value="hold" />
+                <span><b>Hold to talk</b><br /><span class="muted small">Record while the key is held down.</span></span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="talk-mode" value="toggle" />
+                <span><b>Press to start, press to stop</b><br /><span class="muted small">Hands-free for longer dictation.</span></span>
+              </label>
+            </div>
+          </div>
+          <p class="muted small" id="key-note" hidden></p>
+        </div>
+
+        <div class="card">
+          <h2>Input</h2>
+          <div class="row">
+            <label for="microphone">Microphone</label>
+            <select id="microphone"></select>
+          </div>
+          <div class="row">
+            <label for="language">Language</label>
+            <div>
+              <select id="language"></select>
+              <div class="muted small" id="language-note" hidden>English-only models always transcribe English.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>App</h2>
+          <label class="toggle">
+            <input type="checkbox" id="autostart" />
+            <span>Start Vocelle when I sign in</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="history-enabled" />
+            <span>Keep a history of recent dictations <span class="muted small">(text only, stored on this PC)</span></span>
+          </label>
+        </div>
       </section>
-      <section class="card">
-        <h2>Speech models</h2>
-        <p class="muted small">Models run on this PC. Nothing you say is sent anywhere. Bigger models are more accurate but slower.</p>
-        <ul class="models" id="models"></ul>
-        <p class="error" id="models-error" hidden></p>
+
+      <!-- Text -->
+      <section class="page" id="page-text" role="tabpanel" hidden>
+        <div class="card">
+          <h2>Cleanup</h2>
+          <div class="choice-group" role="radiogroup" aria-label="Cleanup level">
+            <label class="choice">
+              <input type="radio" name="cleanup" value="off" />
+              <span><b>Off</b><br /><span class="muted small">Insert exactly what the model heard.</span></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="cleanup" value="light" />
+              <span><b>Light</b><br /><span class="muted small">Remove “um”, “uh” and similar, fix spacing.</span></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="cleanup" value="full" />
+              <span><b>Full</b><br /><span class="muted small">Light, plus stutters (“the the”), sentence capitals and “i” → “I”.</span></span>
+            </label>
+          </div>
+          <div class="preview">
+            <label for="preview-input" class="muted small">Try it</label>
+            <input id="preview-input" type="text" value="um so i think the the plan works, uh, for friday. i'll send it" />
+            <div class="preview-output" id="preview-output" aria-live="polite"></div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="trailing-space" />
+            <span>Add a space after each dictation <span class="muted small">(so back-to-back dictations don't run together)</span></span>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>Dictionary</h2>
+          <p class="muted small">Names and terms Vocelle should spell correctly, one per line.</p>
+          <textarea id="dictionary" rows="5" placeholder="Vocelle&#10;Kubernetes&#10;Dr. Okafor"></textarea>
+        </div>
+
+        <div class="card">
+          <h2>Replacements</h2>
+          <p class="muted small">Whole words, not case-sensitive. Applied before cleanup.</p>
+          <div id="replacements"></div>
+          <button id="add-replacement" type="button">Add replacement</button>
+        </div>
       </section>
-      <p class="muted">Closing this window keeps Vocelle running in the tray. Use the tray menu to quit.</p>
+
+      <!-- Models -->
+      <section class="page" id="page-models" role="tabpanel" hidden>
+        <div class="card">
+          <h2>Speech models</h2>
+          <p class="muted small">Models run on this PC. Nothing you say is sent anywhere. Bigger models are more accurate but slower.</p>
+          <ul class="models" id="models"></ul>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section class="page" id="page-history" role="tabpanel" hidden>
+        <div class="card">
+          <div class="card-head">
+            <h2>Recent dictations</h2>
+            <button id="clear-history" type="button" class="danger">Clear all</button>
+          </div>
+          <ul class="history" id="history"></ul>
+          <p class="muted small" id="history-empty" hidden>Nothing here yet. Your dictations will appear here.</p>
+          <p class="muted small" id="history-off" hidden>History is off. Turn it on under General.</p>
+        </div>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
