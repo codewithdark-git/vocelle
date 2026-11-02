@@ -75,6 +75,10 @@ Every release ships installers for Windows (`.exe`) and Linux (`.deb`, `.AppImag
 - Linux builds run on Ubuntu 22.04 so the AppImage works on older and newer
   distributions alike.
 - Third-party GitHub Actions are pinned to commit SHAs; Dependabot proposes
-  updates.
+  updates. Before merging a major update of `tauri-action`, check that it still
+  only uploads to the release id it's given: the workflow creates the draft
+  itself so the notes come from the changelog.
+- README screenshots live in `assets/screenshots/` (760×640 window at 2×).
+  Retake them when the Settings window changes noticeably.
 - The installers aren't code-signed yet. Once a certificate is available, set
   `bundle.windows.certificateThumbprint` in `tauri.conf.json`.

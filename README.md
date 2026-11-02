@@ -34,9 +34,42 @@
 
 - **Works offline.** Speech recognition runs on your computer with open-source Whisper models. No account, no internet needed after the model download.
 - **Private by design.** Your audio never leaves your computer. No screenshots, no telemetry.
-- **Types anywhere.** Word, Chrome, Slack, Teams, VS Code, Notepad: if it has a text cursor, Vocelle can type into it.
+- **Types anywhere.** Word, Chrome, Slack, Teams, VS Code, Notepad: if an app has a text cursor and accepts paste, Vocelle can type into it.
 - **Reads like you typed it.** Filler words, stutters and spacing are cleaned up, and your dictionary gets names right.
 - **Stays out of the way.** A small tray app with a floating indicator that never steals focus.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/general.png" alt="General tab: speech model status, talk key and mode, microphone and language"></td>
+    <td width="50%"><img src="assets/screenshots/text.png" alt="Text tab: cleanup levels with a live preview, and the personal dictionary"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>General</b>: talk key, mode, microphone</td>
+    <td align="center"><b>Text</b>: cleanup with live preview, dictionary</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/models.png" alt="Models tab: six Whisper models with download and use buttons"></td>
+    <td><img src="assets/screenshots/history.png" alt="History tab: recent dictations with Copy and Delete"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Models</b>: download and switch, all local</td>
+    <td align="center"><b>History</b>: copy back anything you said</td>
+  </tr>
+</table>
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Hold the talk key"] --> B["Record the microphone<br/>(in memory only)"]
+    B --> C["Whisper transcribes<br/>on your computer"]
+    C --> D["Cleanup, dictionary<br/>and replacements"]
+    D --> E["Pasted at your cursor,<br/>clipboard restored"]
+```
+
+Everything in this chain runs on your computer. Voice detection skips silence, so a key press without speech types nothing.
 
 ## Features
 
@@ -218,6 +251,54 @@ Switch to a smaller model: *Base (English)* or *Tiny (English)*. Closing CPU-hea
 Your CPU may not support AVX2 (see [System requirements](#system-requirements)). Support for older CPUs is planned.
 </details>
 
+<details>
+<summary><b>Linux: nothing appears in a terminal</b></summary>
+
+Vocelle pastes with Ctrl+V, but most Linux terminals paste with Ctrl+Shift+V. Dictate into another app for now; terminal support is planned.
+</details>
+
+## Updating
+
+Download the newer installer from [Releases](https://github.com/codewithdark-git/vocelle/releases/latest) and run it over the installed version (Windows), or install the new `.deb` or AppImage the same way as before. Your settings, history and downloaded models are stored outside the app folder, so they carry over. Automatic updates are planned.
+
+## FAQ
+
+<details>
+<summary><b>Does Vocelle need an internet connection?</b></summary>
+
+Only to download a speech model the first time. After that it works fully offline.
+</details>
+
+<details>
+<summary><b>Does it send my voice or text anywhere?</b></summary>
+
+No. Recording, transcription and cleanup all happen on your computer. See [Privacy](#privacy).
+</details>
+
+<details>
+<summary><b>Which model should I use?</b></summary>
+
+Start with the one marked *Recommended for this PC*. If dictation feels slow, try a smaller model; if words come out wrong, try a bigger one. English-only models are the better choice when you only dictate in English.
+</details>
+
+<details>
+<summary><b>Can I dictate in other languages?</b></summary>
+
+Yes. Download a multilingual model (Base, Small or Large Turbo) and choose the language on the General tab, or leave it on automatic detection.
+</details>
+
+<details>
+<summary><b>Does it work with a GPU?</b></summary>
+
+Official builds use the CPU, which is fast enough for everyday dictation with Base or Small. GPU builds are possible from source (see [Development](#development)); GPU support in official builds is planned.
+</details>
+
+<details>
+<summary><b>Is there a macOS version?</b></summary>
+
+Not yet. Vocelle supports Windows, with Linux as a preview.
+</details>
+
 ## Uninstall
 
 - **Windows:** *Settings → Apps → Installed apps → Vocelle → Uninstall.*
@@ -237,87 +318,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what's in each release.
 
 ## Development
 
-<details>
-<summary><b>Build from source</b></summary>
-
-**Windows requirements**
-
-- Rust stable (MSVC toolchain)
-- Visual Studio 2022 Build Tools with *Desktop development with C++* (includes CMake and the Windows SDK)
-- LLVM, used to generate whisper.cpp bindings: `winget install LLVM.LLVM` (the build looks in `C:\Program Files\LLVM\bin`; override with `LIBCLANG_PATH`)
-- Node.js 22+ and npm
-
-**Linux requirements** (Debian/Ubuntu package names)
-
-```bash
-sudo apt install build-essential cmake libclang-dev libwebkit2gtk-4.1-dev \
-  libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
-  libasound2-dev libxtst-dev libx11-dev
-export LIBCLANG_PATH="$(dirname "$(ls /usr/lib/llvm-*/lib/libclang.so* | head -1)")"
-```
-
-**Run**
-
-```bash
-npm install
-npm run tauri dev
-```
-
-**Check** (formatting, lint, tests, type check; the same as CI)
-
-```bash
-npm run check
-```
-
-**Build installers**
-
-```bash
-npm run tauri build -- --bundles nsis            # Windows
-npm run tauri build -- --bundles deb,appimage    # Linux
-```
-
-Output goes to `src-tauri/target/release/bundle/`. For GPU transcription, add `--features vulkan` (needs the Vulkan SDK).
-
-**Test transcription against WAV files** (16 kHz mono)
-
-```bash
-cd src-tauri
-VOCELLE_TEST_MODEL=path/to/ggml-base.en.bin VOCELLE_TEST_WAV="a.wav;b.wav" \
-  cargo test transcribe_wav_files -- --ignored --nocapture
-```
-
-**End-to-end test hooks** (debug builds only; release builds ignore them):
-
-- `VOCELLE_TEST_INJECTED_KEYS=1` accepts a talk key sent with `SendInput` (Windows).
-- `VOCELLE_TEST_AUDIO=clip.wav` uses a 16 kHz mono 16-bit WAV instead of the microphone.
-</details>
-
-<details>
-<summary><b>Project layout</b></summary>
-
-```
-src/                    Settings and overlay UI (TypeScript + Vite)
-  main.ts               Tabs, General and Text pages, auto-save
-  models.ts, history.ts Models and History pages
-  api.ts                Typed backend commands
-src-tauri/src/
-  hotkey/               Talk key listener (Windows hook, Linux X11)
-  insert/               Pasting with clipboard preservation (Windows, Linux)
-  audio.rs              Microphone capture, resampled to 16 kHz mono
-  asr.rs                whisper.cpp transcription with voice detection
-  cleanup.rs            Filler, stutter, spacing and casing cleanup
-  dictation.rs          Key → record → transcribe → clean up → insert
-  history.rs            Recent dictations
-  keys.rs               Talk key catalog
-  models.rs             Model catalog and verified downloader
-  settings.rs           settings.json with validation
-  commands.rs, speech.rs  Commands for the Settings window
-  overlay.rs, tray.rs   Floating indicator and tray icon
-assets/                 Logo files
-site/                   Website (static HTML, deployed to GitHub Pages)
-docs/RELEASING.md       How releases are versioned and published
-```
-</details>
+Build instructions, architecture and test hooks are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Releases follow [docs/RELEASING.md](docs/RELEASING.md). To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
