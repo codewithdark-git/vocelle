@@ -1,6 +1,6 @@
-//! Microphone capture through WASAPI (via cpal).
+//! Microphone capture through cpal (WASAPI on Windows, ALSA/PulseAudio on Linux).
 //!
-//! Records from the default input device, mixes to mono, and resamples to the
+//! Records from the chosen or default input device, mixes to mono, and resamples to the
 //! 16 kHz mono f32 that Whisper expects. A rolling input level is kept for the
 //! overlay meter.
 
@@ -16,6 +16,14 @@ use cpal::{
 
 pub const TARGET_RATE: u32 = 16_000;
 
+/// Names of the microphones currently connected, for the Settings picker.
+pub fn input_devices() -> Vec<String> {
+    cpal::default_host()
+        .input_devices()
+        .map(|devices| devices.map(|d| d.to_string()).collect())
+        .unwrap_or_default()
+}
+
 /// A live recording. Dropping it without calling [`Recording::finish`] discards the audio.
 pub struct Recording {
     stream: Stream,
@@ -25,12 +33,15 @@ pub struct Recording {
 }
 
 impl Recording {
-    /// Opens the default microphone and starts recording immediately.
-    pub fn start() -> Result<Self, String> {
+    /// Opens the named microphone (or the system default if it's `None` or
+    /// unplugged) and starts recording immediately.
+    pub fn start(device_name: Option<&str>) -> Result<Self, String> {
         let host = cpal::default_host();
-        let device = host
-            .default_input_device()
-            .ok_or("No microphone found. Check Windows sound settings.")?;
+        let chosen =
+            device_name.and_then(|name| host.input_devices().ok()?.find(|d| d.to_string() == name));
+        let device = chosen
+            .or_else(|| host.default_input_device())
+            .ok_or("No microphone found. Check your sound settings.")?;
         let supported = device
             .default_input_config()
             .map_err(|e| format!("Couldn't read microphone settings: {e}"))?;

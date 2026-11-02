@@ -1,12 +1,13 @@
 //! Floating status pill shown while dictating.
 //!
 //! It must never take keyboard focus, or the text would be pasted into the
-//! overlay instead of the app the user is typing in. Tauri's `show()` activates
-//! the window, so it is shown with `SW_SHOWNOACTIVATE` and marked
-//! `WS_EX_NOACTIVATE` so clicks on it don't steal focus either.
+//! overlay instead of the app the user is typing in. On Windows, Tauri's
+//! `show()` activates the window, so it is shown with `SW_SHOWNOACTIVATE` and
+//! marked `WS_EX_NOACTIVATE`. On Linux the window is made non-focusable.
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
+#[cfg(windows)]
 use windows::Win32::{
     Foundation::HWND,
     UI::WindowsAndMessaging::{
@@ -38,6 +39,7 @@ fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(LABEL)
 }
 
+#[cfg(windows)]
 fn hwnd(window: &WebviewWindow) -> Option<HWND> {
     window.hwnd().ok().map(|h| HWND(h.0))
 }
@@ -46,6 +48,7 @@ fn hwnd(window: &WebviewWindow) -> Option<HWND> {
 pub fn init(app: &AppHandle) {
     let Some(window) = window(app) else { return };
     let _ = window.set_ignore_cursor_events(true);
+    #[cfg(windows)]
     if let Some(hwnd) = hwnd(&window) {
         unsafe {
             let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -53,17 +56,22 @@ pub fn init(app: &AppHandle) {
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | extra);
         }
     }
+    #[cfg(not(windows))]
+    let _ = window.set_focusable(false);
 }
 
 /// Shows the overlay bottom-center on the monitor under the cursor, without taking focus.
 pub fn show(app: &AppHandle) {
     let Some(window) = window(app) else { return };
     position(&window);
+    #[cfg(windows)]
     if let Some(hwnd) = hwnd(&window) {
         unsafe {
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
     }
+    #[cfg(not(windows))]
+    let _ = window.show();
 }
 
 pub fn hide(app: &AppHandle) {
