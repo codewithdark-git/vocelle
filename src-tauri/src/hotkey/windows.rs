@@ -1,8 +1,10 @@
-//! Global hold-to-talk key, read with a low-level keyboard hook.
+//! Windows: a low-level keyboard hook.
 //!
 //! `RegisterHotKey` only reports key presses, so it can't tell when a key is
 //! released. A `WH_KEYBOARD_LL` hook sees both, for every app, without
-//! needing focus. The hook never swallows keys: other apps still receive them.
+//! needing focus. Modifier talk keys pass through to other apps so shortcuts
+//! keep working; other talk keys (Caps Lock, F-keys) are swallowed so they
+//! don't also toggle caps or trigger app shortcuts.
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, Ordering},
@@ -13,34 +15,36 @@ use std::sync::{
 use windows::Win32::{
     Foundation::{LPARAM, LRESULT, WPARAM},
     System::LibraryLoader::GetModuleHandleW,
-    UI::{
-        Input::KeyboardAndMouse::VK_RCONTROL,
-        WindowsAndMessaging::{
-            CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-            KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP,
-            WM_SYSKEYDOWN, WM_SYSKEYUP,
-        },
+    UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
+        KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
+        WM_SYSKEYUP,
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HotkeyEvent {
-    /// The talk key went down.
-    Pressed,
-    /// The talk key came back up.
-    Released,
-    /// Another key was pressed while the talk key was held (e.g. Right Ctrl+C),
-    /// so the user meant a shortcut, not dictation.
-    Interrupted,
-}
-
-/// Default talk key: Right Ctrl. Rarely used on its own, and present on most keyboards.
-pub const DEFAULT_KEY: u32 = VK_RCONTROL.0 as u32;
+use super::HotkeyEvent;
+use crate::keys::{self, TalkKey};
 
 static SENDER: OnceLock<Sender<HotkeyEvent>> = OnceLock::new();
-static TALK_KEY: AtomicU32 = AtomicU32::new(DEFAULT_KEY);
+static TALK_KEY: AtomicU32 = AtomicU32::new(0);
+static SWALLOW_TALK_KEY: AtomicBool = AtomicBool::new(false);
 static HELD: AtomicBool = AtomicBool::new(false);
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+
+pub fn supports(code: &str) -> bool {
+    keys::windows_vk(code).is_some()
+}
+
+pub fn set_talk_key(key: &TalkKey) -> Result<(), String> {
+    let vk = keys::windows_vk(key.code).ok_or_else(|| format!("{} isn't supported", key.label))?;
+    // A key change mid-press would leave HELD stuck; release it first.
+    if HELD.swap(false, Ordering::Relaxed) {
+        send(HotkeyEvent::Released);
+    }
+    SWALLOW_TALK_KEY.store(!key.modifier, Ordering::Relaxed);
+    TALK_KEY.store(vk, Ordering::Relaxed);
+    Ok(())
+}
 
 /// Installs the hook on its own thread, which must keep pumping messages for the
 /// hook to fire. Events are delivered on `tx`.
@@ -109,6 +113,10 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                 && !INTERRUPTED.swap(true, Ordering::Relaxed)
             {
                 send(HotkeyEvent::Interrupted);
+            }
+
+            if is_talk_key && (down || up) && SWALLOW_TALK_KEY.load(Ordering::Relaxed) {
+                return LRESULT(1);
             }
         }
     }
