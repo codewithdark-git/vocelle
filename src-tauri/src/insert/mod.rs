@@ -25,6 +25,7 @@ const RESTORE_DELAY: Duration = Duration::from_millis(250);
 pub enum InsertError {
     /// The focused window runs as administrator and we don't, so Windows
     /// blocks our keystrokes (User Interface Privilege Isolation).
+    #[cfg(windows)]
     ElevatedTarget,
     Clipboard(String),
     Keystrokes(String),
@@ -33,6 +34,7 @@ pub enum InsertError {
 impl std::fmt::Display for InsertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            #[cfg(windows)]
             Self::ElevatedTarget => write!(f, "Can't type into an app running as administrator"),
             Self::Clipboard(e) => write!(f, "Clipboard error: {e}"),
             Self::Keystrokes(e) => write!(f, "Couldn't send keystrokes: {e}"),
