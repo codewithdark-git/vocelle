@@ -1,6 +1,6 @@
 [package]
 name = "vocelle"
-version = "0.1.0"
+version = "0.2.0"
 description = "Private, offline voice dictation for Windows and Linux"
 edition = "2021"
 publish = false
