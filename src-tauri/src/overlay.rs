@@ -1,4 +1,5 @@
-//! Floating status pill shown while dictating.
+//! Floating status pill shown while dictating. It has no text: each phase
+//! has its own shape and animation (see overlay.css).
 //!
 //! It must never take keyboard focus, or the text would be pasted into the
 //! overlay instead of the app the user is typing in. On Windows, Tauri's
@@ -17,8 +18,9 @@ use windows::Win32::{
 };
 
 pub const LABEL: &str = "overlay";
-/// Gap between the overlay and the bottom of the screen's work area (above the taskbar).
-const BOTTOM_MARGIN: i32 = 48;
+/// Gap between the overlay and the bottom of the screen's work area, so it sits
+/// just above the taskbar, out of the way of what the user is typing.
+const BOTTOM_MARGIN: i32 = 12;
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -26,6 +28,8 @@ pub enum Phase {
     Listening,
     Transcribing,
     Done,
+    /// Nothing was said, so nothing was typed.
+    Empty,
     Error,
 }
 

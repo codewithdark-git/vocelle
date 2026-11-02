@@ -6,11 +6,20 @@
     <link rel="stylesheet" href="/src/overlay.css" />
   </head>
   <body>
-    <div class="pill" id="pill" data-phase="listening">
-      <div class="meter" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
+    <!-- Wordless on purpose: each phase has its own shape and motion. -->
+    <div class="pill" id="pill" data-phase="listening" role="status" aria-label="Listening">
+      <div class="bars" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
       </div>
-      <span class="label" id="label">Listening…</span>
+      <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <svg class="icon check" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12.5l4.5 4.5L19 7.5" />
+      </svg>
+      <svg class="icon alert" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 7v6" />
+        <circle cx="12" cy="17" r="0.6" />
+      </svg>
+      <span class="dash" aria-hidden="true"></span>
     </div>
     <script type="module" src="/src/overlay.ts"></script>
   </body>
