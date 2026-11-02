@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ["site/**", "**.md"]
   pull_request:
 
 concurrency:
@@ -11,10 +12,11 @@ concurrency:
 
 jobs:
   check:
-    runs-on: windows-latest
-    env:
-      # LLVM is preinstalled on GitHub's Windows runners.
-      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
@@ -30,6 +32,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev libasound2-dev libxtst-dev libx11-dev \
+            libclang-dev cmake
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+
+      # LLVM is preinstalled on GitHub's Windows runners.
+      - name: Windows build settings
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
 
       - name: Install npm packages
         run: npm ci
@@ -49,3 +66,7 @@ jobs:
       - name: Tests
         working-directory: src-tauri
         run: cargo test
+
+      - name: Release notes generator
+        if: runner.os == 'Linux'
+        run: node scripts/release-notes.mjs "$(node -p "require('./package.json').version")" > /dev/null
