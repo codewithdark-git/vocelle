@@ -8,7 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::{
     asr::Engine,
     models::{self, ModelInfo},
-    settings,
+    settings::Store,
 };
 
 /// Model ids currently downloading, so a double click doesn't start two downloads.
@@ -57,7 +57,7 @@ pub fn list_models(
     downloads: State<'_, Downloads>,
 ) -> Result<Vec<ModelStatus>, String> {
     let dir = models_dir(&app)?;
-    let selected = settings::load(&app).model;
+    let selected = app.state::<Store>().get().model;
     let loaded = engine.loaded_model();
     let downloading = downloads.0.lock().unwrap();
     let recommended = models::recommended().id;
@@ -104,7 +104,7 @@ pub fn download_model(
 
         let error = result.err();
         // The first model downloaded becomes the active one.
-        if error.is_none() && settings::load(&app).model.is_none() {
+        if error.is_none() && app.state::<Store>().get().model.is_none() {
             let _ = select(&app, model);
         }
         let _ = app.emit(
@@ -125,16 +125,20 @@ pub fn select_model(app: AppHandle, id: String) -> Result<(), String> {
 
 /// Saves `model` as the active model and loads it in the background.
 fn select(app: &AppHandle, model: &'static ModelInfo) -> Result<(), String> {
-    let mut s = settings::load(app);
-    s.model = Some(model.id.to_owned());
-    settings::save(app, &s)?;
+    app.state::<Store>()
+        .update(app, |s| s.model = Some(model.id.to_owned()))?;
     load_in_background(app.clone(), model);
     Ok(())
 }
 
 /// Loads the saved model at startup, if it has been downloaded.
 pub fn load_selected(app: &AppHandle) {
-    let Some(model) = settings::load(app).model.and_then(|id| models::find(&id)) else {
+    let Some(model) = app
+        .state::<Store>()
+        .get()
+        .model
+        .and_then(|id| models::find(&id))
+    else {
         return;
     };
     load_in_background(app.clone(), model);
