@@ -1,7 +1,9 @@
-//! Recent dictations, kept in a small JSON file in the app's data folder.
+//! Recent dictations, kept in a small JSON file in the app's data folder,
+//! and running totals for the Home page.
 //!
 //! Only the text is stored (never audio), and the user can turn history off
-//! or clear it at any time.
+//! or clear it at any time. The totals are just counts, kept even when
+//! history is off.
 
 use std::{
     fs,
@@ -24,6 +26,16 @@ pub struct Entry {
     /// Length of the recording.
     pub seconds: f32,
     pub model: String,
+}
+
+/// Totals across all dictations, for the Home page.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Stats {
+    pub dictations: u64,
+    pub words: u64,
+    /// Total length of the recordings.
+    pub seconds: f64,
 }
 
 /// Serializes file access between the dictation thread and Settings commands.
@@ -57,6 +69,22 @@ impl History {
         write(app, &entries);
     }
 
+    pub fn stats(&self, app: &AppHandle) -> Stats {
+        let _lock = self.0.lock().unwrap();
+        read_json(&data_file(app, "stats.json")).unwrap_or_default()
+    }
+
+    /// Adds one dictation to the totals.
+    pub fn count(&self, app: &AppHandle, text: &str, seconds: f32) {
+        let _lock = self.0.lock().unwrap();
+        let path = data_file(app, "stats.json");
+        let mut stats: Stats = read_json(&path).unwrap_or_default();
+        stats.dictations += 1;
+        stats.words += text.split_whitespace().count() as u64;
+        stats.seconds += f64::from(seconds);
+        write_json(&path, &stats);
+    }
+
     pub fn delete(&self, app: &AppHandle, at: u64) {
         let _lock = self.0.lock().unwrap();
         let mut entries = read(app);
@@ -73,27 +101,34 @@ impl History {
 }
 
 fn file(app: &AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_local_data_dir()
-        .ok()
-        .map(|d| d.join("history.json"))
+    data_file(app, "history.json")
+}
+
+fn data_file(app: &AppHandle, name: &str) -> Option<PathBuf> {
+    app.path().app_local_data_dir().ok().map(|d| d.join(name))
+}
+
+fn read_json<T: serde::de::DeserializeOwned>(path: &Option<PathBuf>) -> Option<T> {
+    let text = fs::read_to_string(path.as_ref()?).ok()?;
+    serde_json::from_str(&text).ok()
 }
 
 fn read(app: &AppHandle) -> Vec<Entry> {
-    file(app)
-        .and_then(|f| fs::read_to_string(f).ok())
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    read_json(&file(app)).unwrap_or_default()
 }
 
 fn write(app: &AppHandle, entries: &[Entry]) {
-    let Some(path) = file(app) else { return };
+    write_json(&file(app), entries);
+}
+
+fn write_json<T: Serialize + ?Sized>(path: &Option<PathBuf>, value: &T) {
+    let Some(path) = path else { return };
     if let Some(dir) = path.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    match serde_json::to_string(entries) {
+    match serde_json::to_string(value) {
         Ok(json) => {
-            if let Err(err) = fs::write(&path, json) {
+            if let Err(err) = fs::write(path, json) {
                 eprintln!("vocelle: couldn't save history: {err}");
             }
         }

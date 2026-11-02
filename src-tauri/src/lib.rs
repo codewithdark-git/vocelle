@@ -77,6 +77,8 @@ pub fn run() {
             commands::delete_history_entry,
             commands::clear_history,
             commands::copy_text,
+            commands::get_stats,
+            commands::test_microphone,
             speech::list_models,
             speech::download_model,
             speech::select_model,

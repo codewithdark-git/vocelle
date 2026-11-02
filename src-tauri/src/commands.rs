@@ -5,9 +5,9 @@ use tauri::{AppHandle, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::{
-    audio,
+    audio::{self, Recording},
     cleanup::{self, Replacement},
-    history::{Entry, History},
+    history::{Entry, History, Stats},
     hotkey,
     keys::TalkKey,
     settings::{Settings, Store, LANGUAGES},
@@ -133,4 +133,23 @@ pub fn copy_text(text: String) -> Result<(), String> {
     arboard::Clipboard::new()
         .and_then(|mut c| c.set_text(text))
         .map_err(|e| format!("Couldn't copy: {e}"))
+}
+
+#[tauri::command]
+pub fn get_stats(app: AppHandle, history: State<'_, History>) -> Stats {
+    history.stats(&app)
+}
+
+/// Listens to `microphone` for two seconds and returns the loudest level heard
+/// (0.0–1.0), so the welcome setup can show whether the microphone works.
+#[tauri::command(async)]
+pub fn test_microphone(microphone: Option<String>) -> Result<f32, String> {
+    let rec = Recording::start(microphone.as_deref())?;
+    let mut peak = 0.0_f32;
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while std::time::Instant::now() < until {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        peak = peak.max(rec.level());
+    }
+    Ok(peak)
 }
