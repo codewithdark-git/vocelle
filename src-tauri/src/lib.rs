@@ -1,5 +1,6 @@
 mod asr;
 mod audio;
+mod cleanup;
 mod dictation;
 mod hotkey;
 mod insert;
