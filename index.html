@@ -7,155 +7,274 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div class="brand">
-        <img src="/assets/logo-mark.svg" alt="" width="28" height="28" />
-        <span>Vocelle</span>
-        <span class="muted small" id="version"></span>
-      </div>
-      <nav class="tabs" role="tablist" aria-label="Settings sections">
-        <button role="tab" data-tab="general" aria-selected="true">General</button>
-        <button role="tab" data-tab="text" aria-selected="false">Text</button>
-        <button role="tab" data-tab="models" aria-selected="false">Models</button>
-        <button role="tab" data-tab="history" aria-selected="false">History</button>
-      </nav>
-      <span class="save-state small muted" id="save-state" aria-live="polite"></span>
-    </header>
-
-    <main>
-      <p class="error" id="error" hidden></p>
-
-      <!-- General -->
-      <section class="page" id="page-general" role="tabpanel">
-        <div class="card status">
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="/assets/logo-mark.svg" alt="" width="32" height="32" />
           <div>
-            <div class="muted small">Speech model</div>
-            <div id="engine-status">Checking…</div>
-          </div>
-          <div>
-            <div class="muted small">To dictate</div>
-            <div id="howto">…</div>
+            <div class="brand-name">Vocelle</div>
+            <div class="brand-version" id="version"></div>
           </div>
         </div>
 
-        <div class="card">
-          <h2>Talk key</h2>
-          <div class="row">
-            <label for="talk-key">Key</label>
-            <div class="inline">
-              <select id="talk-key"></select>
-              <button id="capture-key" type="button">Press a key…</button>
+        <nav class="nav" role="tablist" aria-label="Sections" aria-orientation="vertical">
+          <button role="tab" data-tab="home" aria-selected="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /></svg>
+            Home
+          </button>
+          <button role="tab" data-tab="general" aria-selected="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+            General
+          </button>
+          <button role="tab" data-tab="text" aria-selected="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V5h14v1M12 5v14M9 19h6" /></svg>
+            Text
+          </button>
+          <button role="tab" data-tab="models" aria-selected="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4" /></svg>
+            Models
+          </button>
+        </nav>
+
+        <div class="engine" id="engine" data-state="loading">
+          <span class="engine-dot" aria-hidden="true"></span>
+          <span id="engine-status">Checking…</span>
+        </div>
+      </aside>
+
+      <main>
+        <p class="error" id="error" role="alert" hidden></p>
+
+        <!-- Home -->
+        <section class="page" id="page-home" role="tabpanel">
+          <header class="page-head">
+            <h1 id="greeting">Welcome back</h1>
+            <p>Your voice, typed anywhere. Everything stays on this PC.</p>
+          </header>
+
+          <div class="hero">
+            <div class="hero-text">
+              <div class="hero-title">Hold <kbd id="hero-key">Right Ctrl</kbd> and speak</div>
+              <div class="hero-sub">Release, and the text appears where your cursor is.</div>
+            </div>
+            <div class="hero-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-value" id="stat-words">0</div>
+              <div class="stat-label">words dictated</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="stat-saved">0 min</div>
+              <div class="stat-label">saved vs. typing</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="stat-count">0</div>
+              <div class="stat-label">dictations</div>
             </div>
           </div>
-          <div class="row">
-            <span class="label">Mode</span>
-            <div class="choice-group" role="radiogroup" aria-label="Talk mode">
-              <label class="choice">
-                <input type="radio" name="talk-mode" value="hold" />
-                <span><b>Hold to talk</b><br /><span class="muted small">Record while the key is held down.</span></span>
-              </label>
-              <label class="choice">
-                <input type="radio" name="talk-mode" value="toggle" />
-                <span><b>Press to start, press to stop</b><br /><span class="muted small">Hands-free for longer dictation.</span></span>
-              </label>
-            </div>
-          </div>
-          <p class="muted small" id="key-note" hidden></p>
-        </div>
 
-        <div class="card">
-          <h2>Input</h2>
-          <div class="row">
-            <label for="microphone">Microphone</label>
-            <select id="microphone"></select>
-          </div>
-          <div class="row">
-            <label for="language">Language</label>
-            <div>
-              <select id="language"></select>
-              <div class="muted small" id="language-note" hidden>English-only models always transcribe English.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>App</h2>
-          <label class="toggle">
-            <input type="checkbox" id="autostart" />
-            <span>Start Vocelle when I sign in</span>
-          </label>
-          <label class="toggle">
-            <input type="checkbox" id="history-enabled" />
-            <span>Keep a history of recent dictations <span class="muted small">(text only, stored on this PC)</span></span>
-          </label>
-        </div>
-      </section>
-
-      <!-- Text -->
-      <section class="page" id="page-text" role="tabpanel" hidden>
-        <div class="card">
-          <h2>Cleanup</h2>
-          <div class="choice-group" role="radiogroup" aria-label="Cleanup level">
-            <label class="choice">
-              <input type="radio" name="cleanup" value="off" />
-              <span><b>Off</b><br /><span class="muted small">Insert exactly what the model heard.</span></span>
-            </label>
-            <label class="choice">
-              <input type="radio" name="cleanup" value="light" />
-              <span><b>Light</b><br /><span class="muted small">Remove “um”, “uh” and similar, fix spacing.</span></span>
-            </label>
-            <label class="choice">
-              <input type="radio" name="cleanup" value="full" />
-              <span><b>Full</b><br /><span class="muted small">Light, plus stutters (“the the”), sentence capitals and “i” → “I”.</span></span>
-            </label>
-          </div>
-          <div class="preview">
-            <label for="preview-input" class="muted small">Try it</label>
-            <input id="preview-input" type="text" value="um so i think the the plan works, uh, for friday. i'll send it" />
-            <div class="preview-output" id="preview-output" aria-live="polite"></div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="trailing-space" />
-            <span>Add a space after each dictation <span class="muted small">(so back-to-back dictations don't run together)</span></span>
-          </label>
-        </div>
-
-        <div class="card">
-          <h2>Dictionary</h2>
-          <p class="muted small">Names and terms Vocelle should spell correctly, one per line.</p>
-          <textarea id="dictionary" rows="5" placeholder="Vocelle&#10;Kubernetes&#10;Dr. Okafor"></textarea>
-        </div>
-
-        <div class="card">
-          <h2>Replacements</h2>
-          <p class="muted small">Whole words, not case-sensitive. Applied before cleanup.</p>
-          <div id="replacements"></div>
-          <button id="add-replacement" type="button">Add replacement</button>
-        </div>
-      </section>
-
-      <!-- Models -->
-      <section class="page" id="page-models" role="tabpanel" hidden>
-        <div class="card">
-          <h2>Speech models</h2>
-          <p class="muted small">Models run on this PC. Nothing you say is sent anywhere. Bigger models are more accurate but slower.</p>
-          <ul class="models" id="models"></ul>
-        </div>
-      </section>
-
-      <!-- History -->
-      <section class="page" id="page-history" role="tabpanel" hidden>
-        <div class="card">
-          <div class="card-head">
+          <div class="section-head">
             <h2>Recent dictations</h2>
-            <button id="clear-history" type="button" class="danger">Clear all</button>
+            <button id="clear-history" type="button" class="danger ghost">Clear all</button>
           </div>
-          <ul class="history" id="history"></ul>
-          <p class="muted small" id="history-empty" hidden>Nothing here yet. Your dictations will appear here.</p>
-          <p class="muted small" id="history-off" hidden>History is off. Turn it on under General.</p>
-        </div>
-      </section>
-    </main>
+          <div id="history" class="history"></div>
+          <div class="empty" id="history-empty" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            <p>Nothing here yet. Hold your talk key and say something.</p>
+          </div>
+          <div class="empty" id="history-off" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></svg>
+            <p>History is off, so dictations aren't listed. Turn on <b>Keep history</b> in General.</p>
+          </div>
+        </section>
+
+        <!-- General -->
+        <section class="page" id="page-general" role="tabpanel" hidden>
+          <header class="page-head">
+            <h1>General</h1>
+            <p>How you start a dictation and what Vocelle listens to.</p>
+          </header>
+
+          <div class="group">
+            <div class="setting">
+              <div class="setting-text">
+                <label for="talk-key">Talk key</label>
+                <p id="key-note">Hold it while you speak.</p>
+              </div>
+              <div class="setting-control inline">
+                <select id="talk-key"></select>
+                <button id="capture-key" type="button">Press a key…</button>
+              </div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <label for="microphone">Microphone</label>
+                <p>Used only while you hold the talk key.</p>
+              </div>
+              <div class="setting-control"><select id="microphone"></select></div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <label for="language">Language</label>
+                <p id="language-note">The language you'll speak.</p>
+              </div>
+              <div class="setting-control"><select id="language"></select></div>
+            </div>
+          </div>
+
+          <div class="group">
+            <label class="setting switch-row">
+              <div class="setting-text">
+                <span class="setting-label">Start when I sign in</span>
+                <p>Open Vocelle in the tray when you sign in.</p>
+              </div>
+              <input type="checkbox" role="switch" id="autostart" />
+            </label>
+            <label class="setting switch-row">
+              <div class="setting-text">
+                <span class="setting-label">Keep history</span>
+                <p>List recent dictations on Home. Text only, on this PC; audio is never saved.</p>
+              </div>
+              <input type="checkbox" role="switch" id="history-enabled" />
+            </label>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label">Setup guide</span>
+                <p>Walk through the welcome steps again.</p>
+              </div>
+              <button id="rerun-welcome" type="button">Open</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Text -->
+        <section class="page" id="page-text" role="tabpanel" hidden>
+          <header class="page-head">
+            <h1>Text</h1>
+            <p>Make dictated text read like you typed it.</p>
+          </header>
+
+          <div class="group">
+            <div class="setting stacked">
+              <div class="setting-text">
+                <span class="setting-label" id="cleanup-label">Cleanup</span>
+                <p id="cleanup-help"></p>
+              </div>
+              <div class="segmented" role="radiogroup" aria-labelledby="cleanup-label">
+                <label><input type="radio" name="cleanup" value="off" /><span>Off</span></label>
+                <label><input type="radio" name="cleanup" value="light" /><span>Light</span></label>
+                <label><input type="radio" name="cleanup" value="full" /><span>Full</span></label>
+              </div>
+              <div class="preview">
+                <label for="preview-input">You say</label>
+                <input id="preview-input" type="text" value="um so i think the the plan works, uh, for friday. i'll send it" />
+                <span class="preview-label">Vocelle types</span>
+                <div class="preview-output" id="preview-output" aria-live="polite"></div>
+              </div>
+            </div>
+            <label class="setting switch-row">
+              <div class="setting-text">
+                <span class="setting-label">Space after each dictation</span>
+                <p>So back-to-back dictations don't run together.</p>
+              </div>
+              <input type="checkbox" role="switch" id="trailing-space" />
+            </label>
+          </div>
+
+          <div class="group">
+            <div class="setting stacked">
+              <div class="setting-text">
+                <label for="dictionary">Dictionary</label>
+                <p>Names and terms to spell your way, one per line.</p>
+              </div>
+              <textarea id="dictionary" rows="4" placeholder="Vocelle&#10;Kubernetes&#10;Dr. Okafor"></textarea>
+            </div>
+            <div class="setting stacked">
+              <div class="setting-text">
+                <span class="setting-label">Replacements</span>
+                <p>Whole words, not case-sensitive. Applied before cleanup.</p>
+              </div>
+              <div id="replacements"></div>
+              <button id="add-replacement" type="button" class="ghost">+ Add replacement</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Models -->
+        <section class="page" id="page-models" role="tabpanel" hidden>
+          <header class="page-head">
+            <h1>Models</h1>
+            <p>Speech models run on this PC; nothing you say is sent anywhere. Smaller models type faster, bigger ones make fewer mistakes.</p>
+          </header>
+          <ul class="models" id="models"></ul>
+        </section>
+      </main>
+    </div>
+
+    <!-- Welcome setup: shown on first run, and from General → Setup guide. -->
+    <div class="welcome" id="welcome" hidden>
+      <div class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <ol class="steps" id="steps" aria-label="Setup progress"></ol>
+
+        <section class="step" data-step="hello">
+          <img src="/assets/logo-mark.svg" alt="" width="72" height="72" class="welcome-logo" />
+          <h1 id="welcome-title">Talk, and it types.</h1>
+          <p class="lead">Vocelle turns your voice into text in any app: email, chat, documents, code. It runs entirely on this PC, so what you say stays private.</p>
+          <ul class="perks">
+            <li><b>Fast.</b> Text appears moments after you stop talking.</li>
+            <li><b>Private.</b> No account, no cloud, no recordings kept.</li>
+            <li><b>Clean.</b> Filler words and stutters are tidied up for you.</li>
+          </ul>
+        </section>
+
+        <section class="step" data-step="mic" hidden>
+          <h1>Check your microphone</h1>
+          <p class="lead">Pick the microphone you'll use, then say a few words.</p>
+          <select id="welcome-mic" aria-label="Microphone"></select>
+          <div class="mic-test">
+            <button id="mic-test" type="button" class="primary">Test microphone</button>
+            <div class="meter" aria-hidden="true"><span id="mic-meter"></span></div>
+          </div>
+          <p class="note" id="mic-result" aria-live="polite"></p>
+        </section>
+
+        <section class="step" data-step="model" hidden>
+          <h1>Get the speech model</h1>
+          <p class="lead">A one-time download. After this, Vocelle works offline.</p>
+          <div class="model-pick" id="welcome-model"></div>
+          <p class="note">You can switch models any time on the Models page.</p>
+        </section>
+
+        <section class="step" data-step="key" hidden>
+          <h1>Choose your talk key</h1>
+          <p class="lead">Hold it to talk, release to type. Pick a key you don't use for much else.</p>
+          <div class="keycap" id="welcome-key">Right Ctrl</div>
+          <div class="inline center">
+            <select id="welcome-key-select" aria-label="Talk key"></select>
+            <button id="welcome-capture" type="button">Press a key…</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="try" hidden>
+          <h1>Try it</h1>
+          <p class="lead">Click in the box, hold <kbd id="try-key">Right Ctrl</kbd>, say a sentence, and let go.</p>
+          <textarea id="try-box" rows="3" placeholder="Your words will appear here…"></textarea>
+          <p class="note" id="try-result" aria-live="polite"></p>
+        </section>
+
+        <footer class="welcome-actions">
+          <button id="welcome-skip" type="button" class="subtle">Skip setup</button>
+          <div class="inline">
+            <button id="welcome-back" type="button">Back</button>
+            <button id="welcome-next" type="button" class="primary">Get started</button>
+          </div>
+        </footer>
+      </div>
+    </div>
+
+    <div class="toast" id="save-state" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

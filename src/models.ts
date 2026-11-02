@@ -25,15 +25,9 @@ function formatSize(bytes: number): string {
 
 function modelRow(m: ModelStatus): HTMLLIElement {
   const title = el("div", { className: "model-name" }, m.name);
-  if (m.recommended) {
-    title.append(" ", el("span", { className: "tag" }, "Recommended for this PC"));
-  }
-  const info = el(
-    "div",
-    {},
-    title,
-    el("div", { className: "muted small" }, `${m.description} ${formatSize(m.size_bytes)}.`),
-  );
+  if (m.recommended) title.append(el("span", { className: "tag" }, "Recommended"));
+  title.append(el("span", { className: "tag neutral" }, formatSize(m.size_bytes)));
+  const info = el("div", {}, title, el("div", { className: "model-meta" }, m.description));
 
   const action = el("div", { className: "model-action" });
   const pct = progress.get(m.id);
@@ -42,14 +36,14 @@ function modelRow(m: ModelStatus): HTMLLIElement {
     bar.dataset.id = m.id;
     action.append(bar);
   } else if (!m.downloaded) {
-    action.append(el("button", { onclick: () => void download(m.id) }, "Download"));
+    action.append(el("button", { className: "primary", onclick: () => void download(m.id) }, "Download"));
   } else if (m.selected) {
-    const state = m.loaded ? "In use" : loading.has(m.id) ? "Loading…" : "Selected";
-    action.append(el("span", { className: "muted small" }, state));
+    const state = m.loaded ? "✓ In use" : loading.has(m.id) ? "Loading…" : "Selected";
+    action.append(el("span", { className: m.loaded ? "model-state" : "model-state pending" }, state));
   } else {
     action.append(el("button", { onclick: () => void select(m.id) }, "Use"));
   }
-  return el("li", { className: "model" }, info, action);
+  return el("li", { className: m.selected ? "model in-use" : "model" }, info, action);
 }
 
 export async function refreshModels(): Promise<ModelStatus[]> {

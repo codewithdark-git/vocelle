@@ -1,7 +1,9 @@
-// Settings window: tabs, General and Text pages, and auto-save.
+// Main window: Home, General and Text pages, auto-save, and the welcome setup.
 import { api, el, showError, type Choices, type ModelStatus, type Replacement, type Settings } from "./api";
-import { initHistory, refreshHistory } from "./history";
+import { initHome, refreshHome } from "./home";
 import { initModels } from "./models";
+import { enhanceSelect, fillTalkKeys } from "./select";
+import { initWelcome, openWelcome } from "./welcome";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -19,17 +21,24 @@ function showTab(name: string): void {
   document.querySelectorAll<HTMLElement>(".page").forEach((page) => {
     page.hidden = page.id !== `page-${name}`;
   });
-  if (name === "history") void refreshHistory(settings?.history ?? true);
+  if (name === "home") void refreshHome(settings?.history ?? true);
 }
 
 // ---------- Saving ----------
 
-const saveState = () => $("save-state");
+let toastTimer: number | undefined;
+
+function toast(message: string): void {
+  const box = $("save-state");
+  box.textContent = message;
+  box.classList.add("visible");
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => box.classList.remove("visible"), 1400);
+}
 
 /** Saves shortly after the last change, so typing in a field doesn't save on every key. */
 function scheduleSave(delay = 400): void {
   window.clearTimeout(saveTimer);
-  saveState().textContent = "Saving…";
   saveTimer = window.setTimeout(save, delay);
 }
 
@@ -39,11 +48,9 @@ async function save(): Promise<void> {
     // its own copy so half-typed rows don't vanish while the user is editing them.
     await api.saveSettings(settings);
     showError(null);
-    saveState().textContent = "Saved";
-    window.setTimeout(() => (saveState().textContent = ""), 1500);
+    toast("Saved");
     renderStatus();
   } catch (err) {
-    saveState().textContent = "";
     showError(String(err));
   }
 }
@@ -56,23 +63,26 @@ function keyLabel(code: string): string {
 
 function renderStatus(): void {
   const active = models.find((m) => m.selected);
+  const engine = $("engine");
+  engine.dataset.state = !active ? "missing" : active.loaded ? "ready" : "loading";
   $("engine-status").textContent = !active
-    ? "None yet. Download one in Models."
+    ? "No model yet"
     : active.loaded
-      ? `${active.name}, ready`
-      : `${active.name}, loading…`;
-  const key = keyLabel(settings.talk_key);
-  $("howto").textContent =
-    settings.talk_mode === "hold" ? `Hold ${key}, speak, release` : `Press ${key}, speak, press again`;
+      ? `${active.name} ready`
+      : `Loading ${active.name}…`;
+  $("hero-key").textContent = keyLabel(settings.talk_key);
 
   const englishOnly = active?.english_only ?? false;
   $<HTMLSelectElement>("language").disabled = englishOnly;
-  $("language-note").hidden = !englishOnly;
+  $("language-note").textContent = englishOnly
+    ? "English-only models always transcribe English."
+    : "The language you'll speak, or detect it automatically.";
 
   const talkKey = choices.talk_keys.find((k) => k.code === settings.talk_key);
-  const note = $("key-note");
-  note.hidden = !talkKey || talkKey.modifier;
-  note.textContent = "This key is reserved for Vocelle while it's set as the talk key.";
+  $("key-note").textContent =
+    talkKey && !talkKey.modifier
+      ? "Hold it while you speak. It's reserved for Vocelle while set here."
+      : "Hold it while you speak. Shortcuts that use it still work.";
 }
 
 function fillSelect(select: HTMLSelectElement, options: [string, string][], value: string): void {
@@ -82,11 +92,8 @@ function fillSelect(select: HTMLSelectElement, options: [string, string][], valu
 
 function initGeneral(): void {
   const keySelect = $<HTMLSelectElement>("talk-key");
-  fillSelect(
-    keySelect,
-    choices.talk_keys.map((k) => [k.code, k.label]),
-    settings.talk_key,
-  );
+  fillTalkKeys(keySelect, choices.talk_keys, settings.talk_key);
+  enhanceSelect(keySelect);
   keySelect.onchange = () => {
     settings.talk_key = keySelect.value;
     scheduleSave(0);
@@ -94,11 +101,13 @@ function initGeneral(): void {
 
   const capture = $<HTMLButtonElement>("capture-key");
   capture.onclick = () => {
-    capture.textContent = "Press the key now…";
+    capture.textContent = "Press it now…";
+    capture.classList.add("capturing");
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault();
       window.removeEventListener("keydown", onKey, true);
       capture.textContent = "Press a key…";
+      capture.classList.remove("capturing");
       if (choices.talk_keys.some((k) => k.code === e.code)) {
         settings.talk_key = e.code;
         keySelect.value = e.code;
@@ -110,14 +119,6 @@ function initGeneral(): void {
     window.addEventListener("keydown", onKey, true);
   };
 
-  document.querySelectorAll<HTMLInputElement>("input[name=talk-mode]").forEach((radio) => {
-    radio.checked = radio.value === settings.talk_mode;
-    radio.onchange = () => {
-      settings.talk_mode = radio.value as Settings["talk_mode"];
-      scheduleSave(0);
-    };
-  });
-
   const mic = $<HTMLSelectElement>("microphone");
   const mics: [string, string][] = [["", "System default"], ...choices.microphones.map((m): [string, string] => [m, m])];
   // Keep a saved microphone visible even if it's unplugged right now.
@@ -125,6 +126,7 @@ function initGeneral(): void {
     mics.push([settings.microphone, `${settings.microphone} (not connected)`]);
   }
   fillSelect(mic, mics, settings.microphone ?? "");
+  enhanceSelect(mic);
   mic.onchange = () => {
     settings.microphone = mic.value || null;
     scheduleSave(0);
@@ -136,6 +138,7 @@ function initGeneral(): void {
     choices.languages.map((l) => [l.code, l.name]),
     settings.language,
   );
+  enhanceSelect(language);
   language.onchange = () => {
     settings.language = language.value;
     scheduleSave(0);
@@ -155,12 +158,22 @@ function initGeneral(): void {
   historyToggle.onchange = () => {
     settings.history = historyToggle.checked;
     scheduleSave(0);
+    void refreshHome(settings.history);
   };
+
+  $("rerun-welcome").onclick = () => openWelcome();
 }
 
 // ---------- Text ----------
 
+const CLEANUP_HELP: Record<Settings["cleanup"], string> = {
+  off: "Types exactly what the model heard.",
+  light: "Removes “um”, “uh” and similar, and fixes spacing.",
+  full: "Light, plus stutters (“the the”), sentence capitals and “i” → “I”.",
+};
+
 async function renderPreview(): Promise<void> {
+  $("cleanup-help").textContent = CLEANUP_HELP[settings.cleanup];
   const input = $<HTMLInputElement>("preview-input").value;
   $("preview-output").textContent = await api
     .previewCleanup(input, settings.cleanup, settings.replacements)
@@ -184,7 +197,7 @@ function replacementRow(rule: Replacement, index: number): HTMLDivElement {
     void renderPreview();
     scheduleSave(0);
   };
-  return el("div", { className: "replacement" }, from, el("span", { className: "muted" }, "→"), to, remove);
+  return el("div", { className: "replacement" }, from, el("span", { className: "arrow" }, "→"), to, remove);
 }
 
 function renderReplacements(): void {
@@ -245,12 +258,24 @@ async function start(): Promise<void> {
   }
   initGeneral();
   initText();
-  initHistory();
+  initHome();
   initModels((list) => {
     models = list;
     renderStatus();
   });
   renderStatus();
+  void refreshHome(settings.history);
+  initWelcome({
+    settings: () => settings,
+    choices: () => choices,
+    save: async (change) => {
+      Object.assign(settings, change);
+      await save();
+      // Keep the General page in step with choices made in the welcome steps.
+      $<HTMLSelectElement>("talk-key").value = settings.talk_key;
+      $<HTMLSelectElement>("microphone").value = settings.microphone ?? "";
+    },
+  });
 }
 
 void start();

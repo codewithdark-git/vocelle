@@ -2,7 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type CleanupLevel = "off" | "light" | "full";
-export type TalkMode = "hold" | "toggle";
 
 export interface Replacement {
   from: string;
@@ -12,7 +11,6 @@ export interface Replacement {
 export interface Settings {
   model: string | null;
   talk_key: string;
-  talk_mode: TalkMode;
   microphone: string | null;
   language: string;
   cleanup: CleanupLevel;
@@ -20,6 +18,13 @@ export interface Settings {
   dictionary: string[];
   replacements: Replacement[];
   history: boolean;
+  onboarded: boolean;
+}
+
+export interface Stats {
+  dictations: number;
+  words: number;
+  seconds: number;
 }
 
 export interface TalkKey {
@@ -76,6 +81,8 @@ export const api = {
   deleteHistoryEntry: (at: number) => invoke<void>("delete_history_entry", { at }),
   clearHistory: () => invoke<void>("clear_history"),
   copyText: (text: string) => invoke<void>("copy_text", { text }),
+  getStats: () => invoke<Stats>("get_stats"),
+  testMicrophone: (microphone: string | null) => invoke<number>("test_microphone", { microphone }),
 };
 
 const errorBox = () => document.getElementById("error")!;
