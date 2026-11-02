@@ -40,6 +40,16 @@ pub fn run() {
         .manage(history::History::default())
         .setup(|app| {
             app.manage(settings::Store::load(app.handle()));
+            // The Settings window is created only now, after the state its
+            // commands use is registered (it has `"create": false` in the config).
+            let main = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|w| w.label == "main")
+                .expect("main window is configured");
+            tauri::WebviewWindowBuilder::from_config(app.handle(), main)?.build()?;
             tray::create(app.handle())?;
             overlay::init(app.handle());
             dictation::start(app.handle().clone())?;
@@ -60,6 +70,7 @@ pub fn run() {
             commands::settings_choices,
             commands::get_settings,
             commands::save_settings,
+            commands::preview_cleanup,
             commands::get_autostart,
             commands::set_autostart,
             commands::list_history,

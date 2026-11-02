@@ -14,11 +14,12 @@
       {
         "label": "main",
         "title": "Vocelle",
-        "width": 640,
-        "height": 480,
-        "minWidth": 480,
-        "minHeight": 360,
-        "visible": true
+        "width": 760,
+        "height": 640,
+        "minWidth": 520,
+        "minHeight": 480,
+        "visible": true,
+        "create": false
       },
       {
         "label": "overlay",

@@ -6,6 +6,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 use crate::{
     audio,
+    cleanup::{self, Replacement},
     history::{Entry, History},
     hotkey,
     keys::TalkKey,
@@ -84,6 +85,16 @@ pub fn save_settings(
             Err(err)
         }
     }
+}
+
+/// Runs text cleanup on sample text so the Text page can preview a level.
+#[tauri::command]
+pub fn preview_cleanup(
+    text: String,
+    level: cleanup::Level,
+    replacements: Vec<Replacement>,
+) -> String {
+    cleanup::clean(&text, level, &replacements)
 }
 
 #[tauri::command]
