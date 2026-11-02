@@ -1,8 +1,16 @@
 //! Speech recognition with whisper.cpp, running fully on this PC.
+//!
+//! Dictation is short and latency is what users feel, so the engine is tuned
+//! for that: voice detection trims silence before Whisper runs, the encoder
+//! only covers the clip, one decoding state is reused, and the model is warmed
+//! up as soon as it loads.
 
 use std::{path::Path, sync::Mutex, time::Instant};
 
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{
+    FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
+    WhisperVadContext, WhisperVadContextParams, WhisperVadParams,
+};
 
 use crate::{audio::TARGET_RATE, models::ModelInfo};
 
@@ -16,6 +24,14 @@ const FULL_AUDIO_CTX: usize = 1500;
 const AUDIO_CTX_PER_SECOND: f32 = 50.0;
 /// Extra encoder context beyond the clip, which avoids clipped last words.
 const AUDIO_CTX_MARGIN_SECONDS: f32 = 1.0;
+/// Smallest encoder context. Below about 7 s, Whisper tends to repeat a short
+/// phrase over and over; 384 frames fixed that in testing at little cost.
+const MIN_AUDIO_CTX: usize = 384;
+/// Audio kept around the detected speech, so first and last syllables aren't cut.
+const SPEECH_PAD_SECONDS: f32 = 0.25;
+/// Length of the warm-up clip. Whisper sizes its buffers for the longest clip
+/// so far, so warming up with a typical dictation length keeps later ones fast.
+const WARM_UP_SECONDS: usize = 10;
 
 /// Per-dictation choices from Settings.
 #[derive(Debug, Default)]
@@ -28,14 +44,23 @@ pub struct Options {
 
 struct Loaded {
     model: &'static ModelInfo,
-    ctx: WhisperContext,
-    vad_path: Option<String>,
+    /// Reused between dictations; creating a state allocates the model's buffers.
+    state: WhisperState,
+    vad: Option<WhisperVadContext>,
 }
 
 /// The loaded model, shared between the dictation thread and settings commands.
 #[derive(Default)]
 pub struct Engine {
     loaded: Mutex<Option<Loaded>>,
+}
+
+/// Threads for whisper.cpp: every logical core, up to 8. Measured on a
+/// 2-core/4-thread laptop, 4 threads were about a third faster than 2.
+fn threads() -> i32 {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .min(8) as i32
 }
 
 impl Engine {
@@ -49,18 +74,33 @@ impl Engine {
     ) -> Result<(), String> {
         whisper_rs::install_logging_hooks();
         let started = Instant::now();
-        let ctx = WhisperContext::new_with_params(model_path, WhisperContextParameters::default())
+        let mut params = WhisperContextParameters::default();
+        params.flash_attn(true);
+        let ctx = WhisperContext::new_with_params(model_path, params)
             .map_err(|e| format!("Couldn't load the {} model: {e}", model.name))?;
+        // The state keeps the model alive, so the context itself can go.
+        let state = ctx
+            .create_state()
+            .map_err(|e| format!("Speech engine error: {e}"))?;
+        let vad = vad_path.and_then(|path| {
+            let mut params = WhisperVadContextParams::new();
+            params.set_n_threads(1);
+            params.set_use_gpu(false);
+            WhisperVadContext::new(&path.to_string_lossy(), params)
+                .inspect_err(|e| eprintln!("vocelle: voice detection unavailable: {e}"))
+                .ok()
+        });
+        let mut loaded = Loaded { model, state, vad };
+        // The first run pays for memory allocation and cold caches; do it now
+        // instead of during the user's first dictation.
+        let silence = vec![0.0; TARGET_RATE as usize * WARM_UP_SECONDS];
+        let _ = run_whisper(&mut loaded, &silence, &Options::default());
         eprintln!(
             "vocelle: loaded {} in {} ms",
             model.id,
             started.elapsed().as_millis()
         );
-        *self.loaded.lock().unwrap() = Some(Loaded {
-            model,
-            ctx,
-            vad_path: vad_path.map(|p| p.to_string_lossy().into_owned()),
-        });
+        *self.loaded.lock().unwrap() = Some(loaded);
         Ok(())
     }
 
@@ -70,80 +110,182 @@ impl Engine {
 
     /// Transcribes 16 kHz mono audio. Returns an empty string when there was no speech.
     pub fn transcribe(&self, samples: &[f32], options: &Options) -> Result<String, String> {
-        let guard = self.loaded.lock().unwrap();
+        let mut guard = self.loaded.lock().unwrap();
         let loaded = guard
-            .as_ref()
+            .as_mut()
             .ok_or("No speech model yet. Download one in Vocelle settings.")?;
 
-        if loaded.vad_path.is_none() && rms(samples) < SILENCE_RMS {
-            return Ok(String::new());
-        }
-
-        let mut audio = samples.to_vec();
-        if audio.len() < MIN_SAMPLES {
-            audio.resize(MIN_SAMPLES, 0.0);
-        }
-
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        let threads = std::thread::available_parallelism()
-            .map_or(4, |n| n.get())
-            .min(8);
-        params.set_n_threads(threads as i32);
-        let language = match (loaded.model.english_only, options.language.as_str()) {
-            (true, _) => "en",
-            (false, "") => "auto",
-            (false, code) => code,
-        };
-        params.set_language(Some(language));
-        if let Some(prompt) = &options.prompt {
-            params.set_initial_prompt(prompt);
-        }
-        params.set_audio_ctx(audio_ctx(audio.len()));
-        params.set_no_context(true);
-        params.set_no_timestamps(true);
-        params.set_suppress_blank(true);
-        // Drops non-speech tokens such as "[BLANK_AUDIO]" or "(music)".
-        params.set_suppress_nst(true);
-        params.set_print_special(false);
-        params.set_print_progress(false);
-        params.set_print_realtime(false);
-        params.set_print_timestamps(false);
-        if let Some(vad) = &loaded.vad_path {
-            // The path must be set first; whisper-rs panics otherwise.
-            params.set_vad_model_path(Some(vad));
-            params.enable_vad(true);
-        }
-
         let started = Instant::now();
-        let mut state = loaded
-            .ctx
-            .create_state()
-            .map_err(|e| format!("Speech engine error: {e}"))?;
-        state
-            .full(params, &audio)
-            .map_err(|e| format!("Transcription failed: {e}"))?;
-
-        let text = state
-            .as_iter()
-            .filter_map(|seg| seg.to_str_lossy().ok().map(|s| s.trim().to_owned()))
-            .filter(|s| !s.is_empty() && !is_non_speech(s))
-            .collect::<Vec<_>>()
-            .join(" ");
+        let speech = match &mut loaded.vad {
+            Some(vad) => match speech_span(vad, samples) {
+                Some((from, to)) => &samples[from..to],
+                None => return Ok(String::new()),
+            },
+            None if rms(samples) < SILENCE_RMS => return Ok(String::new()),
+            None => samples,
+        };
+        let text = run_whisper(loaded, speech, options)?;
         eprintln!(
-            "vocelle: transcribed {:.1} s of audio in {} ms with {}",
+            "vocelle: transcribed {:.1} s ({:.1} s of speech) in {} ms with {}",
             samples.len() as f32 / TARGET_RATE as f32,
+            speech.len() as f32 / TARGET_RATE as f32,
             started.elapsed().as_millis(),
             loaded.model.id
         );
         Ok(text)
     }
+
+    /// Where `samples` can be cut at a pause between phrases, so the part before
+    /// it can be transcribed while the user is still talking. The cut is at
+    /// least `min` samples in and leaves at least `tail` samples after it, so
+    /// a word that's still being spoken is never split. `None` without voice
+    /// detection or when there's no such pause yet.
+    pub fn pause_point(&self, samples: &[f32], min: usize, tail: usize) -> Option<usize> {
+        let mut guard = self.loaded.lock().unwrap();
+        let vad = guard.as_mut()?.vad.as_mut()?;
+        let segments: Vec<(usize, usize)> = vad
+            .segments_from_samples(WhisperVadParams::default(), samples)
+            .ok()?
+            .map(|s| (centis_to_index(s.start), centis_to_index(s.end)))
+            .collect();
+        let limit = samples.len().saturating_sub(tail);
+        let pad = (SPEECH_PAD_SECONDS * TARGET_RATE as f32) as usize;
+        // The last phrase that ended early enough; cut in the silence after it.
+        segments
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, &(_, end))| {
+                let next_start = segments.get(i + 1).map_or(samples.len(), |s| s.0);
+                let cut = (end + pad).min(next_start).min(limit);
+                (end <= limit && cut >= min).then_some(cut)
+            })
+    }
+}
+
+fn centis_to_index(centis: f32) -> usize {
+    (centis.max(0.0) / 100.0 * TARGET_RATE as f32) as usize
+}
+
+/// The part of `samples` from the first detected speech to the last, padded a
+/// little. Pauses in between are kept so sentences stay intact. `None` when
+/// nothing sounds like speech.
+fn speech_span(vad: &mut WhisperVadContext, samples: &[f32]) -> Option<(usize, usize)> {
+    let segments: Vec<(f32, f32)> =
+        match vad.segments_from_samples(WhisperVadParams::default(), samples) {
+            Ok(segments) => segments.map(|s| (s.start, s.end)).collect(),
+            Err(err) => {
+                // Transcribe everything rather than drop the dictation.
+                eprintln!("vocelle: voice detection failed: {err}");
+                return Some((0, samples.len()));
+            }
+        };
+    let first = segments.first()?.0;
+    let last = segments.last()?.1;
+    let pad = (SPEECH_PAD_SECONDS * TARGET_RATE as f32) as usize;
+    let from = centis_to_index(first)
+        .saturating_sub(pad)
+        .min(samples.len());
+    let to = centis_to_index(last).saturating_add(pad).min(samples.len());
+    (to > from).then_some((from, to))
+}
+
+fn run_whisper(loaded: &mut Loaded, speech: &[f32], options: &Options) -> Result<String, String> {
+    let mut audio = speech.to_vec();
+    if audio.len() < MIN_SAMPLES {
+        audio.resize(MIN_SAMPLES, 0.0);
+    }
+
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_n_threads(threads());
+    let language = match (loaded.model.english_only, options.language.as_str()) {
+        (true, _) => "en",
+        (false, "") => "auto",
+        (false, code) => code,
+    };
+    params.set_language(Some(language));
+    if let Some(prompt) = &options.prompt {
+        params.set_initial_prompt(prompt);
+    }
+    params.set_audio_ctx(audio_ctx(audio.len()));
+    // Whisper can get stuck repeating a phrase. Its built-in retry catches most
+    // of these (and costs nothing when the first pass is fine); this cap stops
+    // the rest. Fast speech is under 6 tokens a second.
+    params.set_max_tokens(max_tokens(speech.len()));
+    params.set_no_context(true);
+    params.set_no_timestamps(true);
+    params.set_suppress_blank(true);
+    // Drops non-speech tokens such as "[BLANK_AUDIO]" or "(music)".
+    params.set_suppress_nst(true);
+    params.set_print_special(false);
+    params.set_print_progress(false);
+    params.set_print_realtime(false);
+    params.set_print_timestamps(false);
+
+    loaded
+        .state
+        .full(params, &audio)
+        .map_err(|e| format!("Transcription failed: {e}"))?;
+    let text = loaded
+        .state
+        .as_iter()
+        .filter_map(|seg| seg.to_str_lossy().ok().map(|s| s.trim().to_owned()))
+        .filter(|s| !s.is_empty() && !is_non_speech(s))
+        .collect::<Vec<_>>()
+        .join(" ");
+    Ok(drop_repeats(&text))
+}
+
+/// Removes a sentence that Whisper repeated back to back, and a cut-off copy
+/// of it at the end ("Go now. Go now. Go n" -> "Go now."). People rarely say
+/// the same sentence twice in a row in one dictation; Whisper's loops do.
+fn drop_repeats(text: &str) -> String {
+    let normalize = |s: &str| s.trim_end_matches(['.', '?', '!', ',']).to_lowercase();
+    let mut kept: Vec<&str> = Vec::new();
+    for sentence in sentences(text) {
+        let repeat = kept.last().is_some_and(|last| {
+            let (last, this) = (normalize(last), normalize(sentence));
+            last == this || (this.len() >= 4 && last.starts_with(&this))
+        });
+        if !repeat {
+            kept.push(sentence);
+        }
+    }
+    kept.join(" ")
+}
+
+/// Splits after ".", "?" or "!" followed by a space, keeping the punctuation.
+fn sentences(text: &str) -> impl Iterator<Item = &str> {
+    let mut rest = text.trim();
+    std::iter::from_fn(move || {
+        if rest.is_empty() {
+            return None;
+        }
+        let end = rest
+            .char_indices()
+            .find(|&(i, c)| {
+                matches!(c, '.' | '?' | '!') && rest[i + c.len_utf8()..].starts_with(' ')
+            })
+            .map_or(rest.len(), |(i, c)| i + c.len_utf8());
+        let (sentence, tail) = rest.split_at(end);
+        rest = tail.trim_start();
+        Some(sentence)
+    })
+}
+
+/// Upper bound on tokens for a clip, generous for fast speech.
+fn max_tokens(samples: usize) -> i32 {
+    const TOKENS_PER_SECOND: f32 = 10.0;
+    (samples as f32 / TARGET_RATE as f32 * TOKENS_PER_SECOND) as i32 + 16
 }
 
 /// Encoder context for a clip, rounded up to a multiple of 64 and capped at the full 30 s.
 fn audio_ctx(samples: usize) -> i32 {
     let seconds = samples as f32 / TARGET_RATE as f32 + AUDIO_CTX_MARGIN_SECONDS;
     let ctx = (seconds * AUDIO_CTX_PER_SECOND).ceil() as usize;
-    ctx.div_ceil(64).saturating_mul(64).min(FULL_AUDIO_CTX) as i32
+    ctx.div_ceil(64)
+        .saturating_mul(64)
+        .clamp(MIN_AUDIO_CTX, FULL_AUDIO_CTX) as i32
 }
 
 fn rms(samples: &[f32]) -> f32 {
@@ -166,8 +308,26 @@ mod tests {
     #[test]
     fn audio_ctx_scales_with_clip_length() {
         let second = TARGET_RATE as usize;
-        assert_eq!(audio_ctx(3 * second), 256); // (3 + 1) s * 50 = 200 -> 256
+        assert_eq!(audio_ctx(3 * second), 384); // (3 + 1) s * 50 = 200, raised to the minimum
+        assert_eq!(audio_ctx(10 * second), 576); // (10 + 1) s * 50 = 550 -> 576
         assert_eq!(audio_ctx(60 * second), 1500);
+    }
+
+    #[test]
+    fn repeated_sentences_are_dropped() {
+        assert_eq!(
+            drop_repeats("Meet at 3. Meet at 3. Meet at 3. Meet at"),
+            "Meet at 3."
+        );
+        assert_eq!(
+            drop_repeats("Hi. How are you? Fine."),
+            "Hi. How are you? Fine."
+        );
+        assert_eq!(drop_repeats("No. No. Yes."), "No. Yes.");
+        assert_eq!(
+            drop_repeats("Version 2.5 is out. Ship it."),
+            "Version 2.5 is out. Ship it."
+        );
     }
 
     #[test]
@@ -193,7 +353,10 @@ mod tests {
         let model = crate::models::CATALOG
             .iter()
             .find(|m| m.file == file)
-            .expect("model file is in the catalog");
+            // Other files (for example quantized variants) are tried with
+            // Base (English) settings.
+            .or_else(|| crate::models::find("base.en"))
+            .expect("base.en is in the catalog");
         let vad = std::env::var("VOCELLE_TEST_VAD").ok();
         let engine = Engine::default();
         engine
