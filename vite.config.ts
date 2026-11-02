@@ -11,6 +11,9 @@ export default defineConfig({
   build: {
     target: "es2022",
     outDir: "dist",
+    // The app's content security policy only allows files it ships, not
+    // data: URLs, so small assets like the logo are emitted as files too.
+    assetsInlineLimit: 0,
     rollupOptions: {
       // One page per Tauri window.
       input: {
