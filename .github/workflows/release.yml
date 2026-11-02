@@ -7,12 +7,14 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+# Nothing by default; each job asks only for what it needs.
+permissions: {}
 
 jobs:
   draft:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       release_id: ${{ steps.create.outputs.release_id }}
     steps:
@@ -50,6 +52,8 @@ jobs:
           - os: ubuntu-22.04
             bundles: deb,appimage
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
 
@@ -58,9 +62,12 @@ jobs:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          # Pinned by commit, so the toolchain must be named here.
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
           key: release
@@ -72,7 +79,9 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev libxdo-dev libssl-dev libasound2-dev libxtst-dev libx11-dev \
             libclang-dev cmake
-          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+          # llvm-config can point at an LLVM without libclang; find the library itself.
+          libclang=$(ls /usr/lib/llvm-*/lib/libclang.so* /usr/lib/x86_64-linux-gnu/libclang*.so* 2>/dev/null | head -1)
+          echo "LIBCLANG_PATH=$(dirname "$libclang")" >> "$GITHUB_ENV"
 
       - name: Windows build settings
         if: runner.os == 'Windows'
@@ -81,7 +90,7 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
