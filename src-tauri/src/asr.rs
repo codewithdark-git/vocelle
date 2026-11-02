@@ -17,6 +17,15 @@ const AUDIO_CTX_PER_SECOND: f32 = 50.0;
 /// Extra encoder context beyond the clip, which avoids clipped last words.
 const AUDIO_CTX_MARGIN_SECONDS: f32 = 1.0;
 
+/// Per-dictation choices from Settings.
+#[derive(Debug, Default)]
+pub struct Options {
+    /// "auto" or a language code. English-only models always use English.
+    pub language: String,
+    /// Words to bias recognition toward, from the personal dictionary.
+    pub prompt: Option<String>,
+}
+
 struct Loaded {
     model: &'static ModelInfo,
     ctx: WhisperContext,
@@ -60,7 +69,7 @@ impl Engine {
     }
 
     /// Transcribes 16 kHz mono audio. Returns an empty string when there was no speech.
-    pub fn transcribe(&self, samples: &[f32]) -> Result<String, String> {
+    pub fn transcribe(&self, samples: &[f32], options: &Options) -> Result<String, String> {
         let guard = self.loaded.lock().unwrap();
         let loaded = guard
             .as_ref()
@@ -80,11 +89,15 @@ impl Engine {
             .map_or(4, |n| n.get())
             .min(8);
         params.set_n_threads(threads as i32);
-        params.set_language(Some(if loaded.model.english_only {
-            "en"
-        } else {
-            "auto"
-        }));
+        let language = match (loaded.model.english_only, options.language.as_str()) {
+            (true, _) => "en",
+            (false, "") => "auto",
+            (false, code) => code,
+        };
+        params.set_language(Some(language));
+        if let Some(prompt) = &options.prompt {
+            params.set_initial_prompt(prompt);
+        }
         params.set_audio_ctx(audio_ctx(audio.len()));
         params.set_no_context(true);
         params.set_no_timestamps(true);
@@ -201,7 +214,7 @@ mod tests {
                 .map(|s| s.unwrap() as f32 / i16::MAX as f32)
                 .collect();
             let started = Instant::now();
-            let text = engine.transcribe(&samples).unwrap();
+            let text = engine.transcribe(&samples, &Options::default()).unwrap();
             println!(
                 "{wav}: {:.1} s audio -> {} ms
   {text}",
@@ -214,7 +227,9 @@ mod tests {
 
     #[test]
     fn transcribe_without_model_is_a_clear_error() {
-        let err = Engine::default().transcribe(&[0.0; 16_000]).unwrap_err();
+        let err = Engine::default()
+            .transcribe(&[0.0; 16_000], &Options::default())
+            .unwrap_err();
         assert!(err.contains("Download"));
     }
 }

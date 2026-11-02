@@ -1,32 +1,20 @@
 mod asr;
 mod audio;
 mod cleanup;
+mod commands;
 mod dictation;
+mod history;
 mod hotkey;
 mod insert;
+mod keys;
 mod models;
 mod overlay;
 mod settings;
 mod speech;
 mod tray;
 
-use serde::Serialize;
 use tauri::{Manager, WindowEvent};
-
-#[derive(Serialize)]
-struct AppInfo {
-    name: String,
-    version: String,
-}
-
-#[tauri::command]
-fn app_info(app: tauri::AppHandle) -> AppInfo {
-    let pkg = app.package_info();
-    AppInfo {
-        name: pkg.name.clone(),
-        version: pkg.version.to_string(),
-    }
-}
+use tauri_plugin_autostart::MacosLauncher;
 
 /// Brings the settings window to the front, restoring it if hidden or minimized.
 pub(crate) fn show_main_window(app: &tauri::AppHandle) {
@@ -43,9 +31,15 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(asr::Engine::default())
         .manage(speech::Downloads::default())
+        .manage(history::History::default())
         .setup(|app| {
+            app.manage(settings::Store::load(app.handle()));
             tray::create(app.handle())?;
             overlay::init(app.handle());
             dictation::start(app.handle().clone())?;
@@ -62,7 +56,16 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            app_info,
+            commands::app_info,
+            commands::settings_choices,
+            commands::get_settings,
+            commands::save_settings,
+            commands::get_autostart,
+            commands::set_autostart,
+            commands::list_history,
+            commands::delete_history_entry,
+            commands::clear_history,
+            commands::copy_text,
             speech::list_models,
             speech::download_model,
             speech::select_model,
