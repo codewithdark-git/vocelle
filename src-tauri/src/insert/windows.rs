@@ -1,110 +1,137 @@
-//! Puts transcribed text into whatever app has focus.
-//!
-//! Pasting is faster and more reliable than typing characters one by one, so
-//! the text goes on the clipboard, Ctrl+V is sent, and the user's previous
-//! clipboard text is put back afterwards.
+//! Windows: Ctrl+V or Unicode keystrokes through `SendInput`, plus a check for
+//! elevated target windows, which Windows protects from our input.
 
-use std::{mem::size_of, thread, time::Duration};
+use std::mem::size_of;
 
 use windows::Win32::{
     Foundation::{CloseHandle, HANDLE},
     Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
-    System::Threading::{
-        GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    System::{
+        DataExchange::{CloseClipboard, EnumClipboardFormats, OpenClipboard},
+        Threading::{
+            GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+        },
     },
     UI::{
         Input::KeyboardAndMouse::{
             SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_V,
+            KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_RETURN, VK_V,
         },
         WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
     },
 };
 
-/// How long to wait before restoring the clipboard. The target app reads the
-/// clipboard asynchronously after Ctrl+V; restoring too early pastes the old text.
-const RESTORE_DELAY: Duration = Duration::from_millis(250);
+use super::InsertError;
 
-#[derive(Debug)]
-pub enum InsertError {
-    /// The focused window runs as administrator and we don't, so Windows
-    /// blocks our keystrokes (User Interface Privilege Isolation).
-    ElevatedTarget,
-    Clipboard(String),
-    SendInput,
-}
+/// Plain-text clipboard formats: CF_TEXT, CF_OEMTEXT, CF_UNICODETEXT, CF_LOCALE.
+const TEXT_FORMATS: [u32; 4] = [1, 7, 13, 16];
+/// `SendInput` batch size; very long batches can be dropped by some apps.
+const TYPE_BATCH: usize = 256;
 
-impl std::fmt::Display for InsertError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ElevatedTarget => write!(f, "Can't type into an app running as administrator"),
-            Self::Clipboard(e) => write!(f, "Clipboard error: {e}"),
-            Self::SendInput => write!(f, "Windows blocked the paste keystroke"),
-        }
-    }
-}
-
-pub fn insert_text(text: &str) -> Result<(), InsertError> {
-    if text.is_empty() {
-        return Ok(());
-    }
+pub fn check_target() -> Result<(), InsertError> {
     if foreground_is_elevated() && !process_is_elevated(unsafe { GetCurrentProcess() }) {
         return Err(InsertError::ElevatedTarget);
     }
+    Ok(())
+}
 
-    let mut clipboard =
-        arboard::Clipboard::new().map_err(|e| InsertError::Clipboard(e.to_string()))?;
-    // Only text is preserved for now; images or files on the clipboard are lost.
-    let previous = clipboard.get_text().ok();
-    clipboard
-        .set_text(text)
-        .map_err(|e| InsertError::Clipboard(e.to_string()))?;
-
-    let sent = send_ctrl_v();
-
-    thread::sleep(RESTORE_DELAY);
-    match previous {
-        Some(prev) => {
-            let _ = clipboard.set_text(prev);
+/// True when the clipboard is empty or holds only plain text, so pasting and
+/// restoring the text loses nothing.
+pub fn clipboard_is_text_only(_clipboard: &mut arboard::Clipboard) -> bool {
+    unsafe {
+        if OpenClipboard(None).is_err() {
+            // Another app is holding the clipboard; typing is the safe choice.
+            return false;
         }
-        None => {
-            let _ = clipboard.clear();
+        let mut format = 0;
+        let mut text_only = true;
+        loop {
+            format = EnumClipboardFormats(format);
+            if format == 0 {
+                break;
+            }
+            if !TEXT_FORMATS.contains(&format) {
+                text_only = false;
+                break;
+            }
         }
-    }
-
-    if sent {
-        Ok(())
-    } else {
-        Err(InsertError::SendInput)
+        let _ = CloseClipboard();
+        text_only
     }
 }
 
 fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
+    keyboard_input(
+        vk,
+        0,
+        if up {
+            KEYEVENTF_KEYUP
+        } else {
+            KEYBD_EVENT_FLAGS(0)
+        },
+    )
+}
+
+fn keyboard_input(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: vk,
-                dwFlags: if up {
-                    KEYEVENTF_KEYUP
-                } else {
-                    KEYBD_EVENT_FLAGS(0)
-                },
+                wScan: scan,
+                dwFlags: flags,
                 ..Default::default()
             },
         },
     }
 }
 
-fn send_ctrl_v() -> bool {
-    let inputs = [
+fn send(inputs: &[INPUT]) -> Result<(), InsertError> {
+    let sent = unsafe { SendInput(inputs, size_of::<INPUT>() as i32) };
+    if sent as usize == inputs.len() {
+        Ok(())
+    } else {
+        Err(InsertError::Keystrokes(
+            "Windows blocked the keystrokes".into(),
+        ))
+    }
+}
+
+pub fn send_paste() -> Result<(), InsertError> {
+    send(&[
         key(VK_CONTROL, false),
         key(VK_V, false),
         key(VK_V, true),
         key(VK_CONTROL, true),
-    ];
-    let sent = unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
-    sent as usize == inputs.len()
+    ])
+}
+
+/// Types `text` as Unicode keystrokes. Line breaks are sent as Enter.
+pub fn type_text(text: &str) -> Result<(), InsertError> {
+    let mut inputs = Vec::with_capacity(text.len() * 2);
+    for c in text.chars() {
+        if c == '\n' {
+            inputs.push(key(VK_RETURN, false));
+            inputs.push(key(VK_RETURN, true));
+            continue;
+        }
+        if c == '\r' {
+            continue;
+        }
+        let mut units = [0u16; 2];
+        for unit in c.encode_utf16(&mut units) {
+            inputs.push(keyboard_input(VIRTUAL_KEY(0), *unit, KEYEVENTF_UNICODE));
+            inputs.push(keyboard_input(
+                VIRTUAL_KEY(0),
+                *unit,
+                KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+            ));
+        }
+    }
+    for batch in inputs.chunks(TYPE_BATCH) {
+        send(batch)?;
+    }
+    Ok(())
 }
 
 fn foreground_is_elevated() -> bool {
