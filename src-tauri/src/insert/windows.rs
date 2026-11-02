@@ -1,13 +1,22 @@
-//! Windows: Ctrl+V or Unicode keystrokes through `SendInput`, plus a check for
-//! elevated target windows, which Windows protects from our input.
+//! Windows: paste with a full clipboard snapshot, plus a check for elevated
+//! target windows, which Windows protects from our input.
+//!
+//! Every clipboard format (text, formatting, images, files) is copied before
+//! pasting and put back afterwards, so whatever the user had copied survives.
+//! The dictation itself is kept out of clipboard history and cloud sync.
 
-use std::mem::size_of;
+use std::{mem::size_of, ptr, thread, time::Duration};
 
+use arboard::SetExtWindows;
 use windows::Win32::{
-    Foundation::{CloseHandle, HANDLE},
+    Foundation::{CloseHandle, HANDLE, HGLOBAL},
     Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
     System::{
-        DataExchange::{CloseClipboard, EnumClipboardFormats, OpenClipboard},
+        DataExchange::{
+            CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData, OpenClipboard,
+            SetClipboardData,
+        },
+        Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE},
         Threading::{
             GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
         },
@@ -21,10 +30,18 @@ use windows::Win32::{
     },
 };
 
-use super::InsertError;
+use super::{InsertError, RESTORE_DELAY};
 
-/// Plain-text clipboard formats: CF_TEXT, CF_OEMTEXT, CF_UNICODETEXT, CF_LOCALE.
-const TEXT_FORMATS: [u32; 4] = [1, 7, 13, 16];
+/// Clipboard formats whose data is a GDI or private handle rather than memory,
+/// so it can't be copied byte for byte. Windows re-creates the common ones
+/// (e.g. CF_BITMAP from CF_DIB) on its own.
+fn is_handle_format(format: u32) -> bool {
+    matches!(format, 2 | 3 | 9 | 14 | 0x80 | 0x82 | 0x83 | 0x8E)
+        || (0x200..=0x3FF).contains(&format)
+}
+
+/// Above this, the clipboard isn't copied (a huge image, say); the dictation is typed instead.
+const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
 /// `SendInput` batch size; very long batches can be dropped by some apps.
 const TYPE_BATCH: usize = 256;
 
@@ -35,29 +52,117 @@ pub fn check_target() -> Result<(), InsertError> {
     Ok(())
 }
 
-/// True when the clipboard is empty or holds only plain text, so pasting and
-/// restoring the text loses nothing.
-pub fn clipboard_is_text_only(_clipboard: &mut arboard::Clipboard) -> bool {
-    unsafe {
-        if OpenClipboard(None).is_err() {
-            // Another app is holding the clipboard; typing is the safe choice.
-            return false;
+pub fn insert(text: &str) -> Result<(), InsertError> {
+    let Some(snapshot) = Snapshot::take() else {
+        // The clipboard is busy or too big to copy; typing leaves it untouched.
+        return type_text(text);
+    };
+
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| InsertError::Clipboard(e.to_string()))?;
+    clipboard
+        .set()
+        .exclude_from_history()
+        .exclude_from_cloud()
+        .text(text)
+        .map_err(|e| InsertError::Clipboard(e.to_string()))?;
+    let sent = send_paste();
+
+    thread::sleep(RESTORE_DELAY);
+    snapshot.restore();
+    sent
+}
+
+/// A copy of every memory-backed clipboard format.
+struct Snapshot(Vec<(u32, Vec<u8>)>);
+
+/// Holds the clipboard open for as long as it lives.
+struct OpenClipboardGuard;
+
+impl OpenClipboardGuard {
+    fn open() -> Option<Self> {
+        // Another app may be holding the clipboard for a moment; retry briefly.
+        for _ in 0..10 {
+            if unsafe { OpenClipboard(None) }.is_ok() {
+                return Some(Self);
+            }
+            thread::sleep(Duration::from_millis(20));
         }
+        None
+    }
+}
+
+impl Drop for OpenClipboardGuard {
+    fn drop(&mut self) {
+        let _ = unsafe { CloseClipboard() };
+    }
+}
+
+impl Snapshot {
+    fn take() -> Option<Self> {
+        let _open = OpenClipboardGuard::open()?;
+        let mut formats = Vec::new();
+        let mut total = 0;
         let mut format = 0;
-        let mut text_only = true;
         loop {
-            format = EnumClipboardFormats(format);
+            format = unsafe { EnumClipboardFormats(format) };
             if format == 0 {
                 break;
             }
-            if !TEXT_FORMATS.contains(&format) {
-                text_only = false;
-                break;
+            if is_handle_format(format) {
+                continue;
+            }
+            let Some(bytes) = (unsafe { read_global(format) }) else {
+                continue;
+            };
+            total += bytes.len();
+            if total > MAX_SNAPSHOT_BYTES {
+                return None;
+            }
+            formats.push((format, bytes));
+        }
+        Some(Self(formats))
+    }
+
+    fn restore(self) {
+        let Some(_open) = OpenClipboardGuard::open() else {
+            return;
+        };
+        unsafe {
+            let _ = EmptyClipboard();
+            for (format, bytes) in self.0 {
+                if let Some(handle) = write_global(&bytes) {
+                    // On success the system owns the memory.
+                    let _ = SetClipboardData(format, Some(HANDLE(handle.0)));
+                }
             }
         }
-        let _ = CloseClipboard();
-        text_only
     }
+}
+
+/// Copies one clipboard format's memory. The clipboard must be open.
+unsafe fn read_global(format: u32) -> Option<Vec<u8>> {
+    let handle = GetClipboardData(format).ok()?;
+    let global = HGLOBAL(handle.0);
+    let size = GlobalSize(global);
+    let data = GlobalLock(global) as *const u8;
+    if data.is_null() {
+        return None;
+    }
+    let bytes = std::slice::from_raw_parts(data, size).to_vec();
+    let _ = GlobalUnlock(global);
+    Some(bytes)
+}
+
+unsafe fn write_global(bytes: &[u8]) -> Option<HGLOBAL> {
+    let global = GlobalAlloc(GMEM_MOVEABLE, bytes.len().max(1)).ok()?;
+    let data = GlobalLock(global) as *mut u8;
+    if data.is_null() {
+        return None;
+    }
+    ptr::copy_nonoverlapping(bytes.as_ptr(), data, bytes.len());
+    let _ = GlobalUnlock(global);
+    Some(global)
 }
 
 fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
@@ -97,7 +202,7 @@ fn send(inputs: &[INPUT]) -> Result<(), InsertError> {
     }
 }
 
-pub fn send_paste() -> Result<(), InsertError> {
+fn send_paste() -> Result<(), InsertError> {
     send(&[
         key(VK_CONTROL, false),
         key(VK_V, false),
@@ -107,25 +212,24 @@ pub fn send_paste() -> Result<(), InsertError> {
 }
 
 /// Types `text` as Unicode keystrokes. Line breaks are sent as Enter.
-pub fn type_text(text: &str) -> Result<(), InsertError> {
+fn type_text(text: &str) -> Result<(), InsertError> {
     let mut inputs = Vec::with_capacity(text.len() * 2);
     for c in text.chars() {
-        if c == '\n' {
-            inputs.push(key(VK_RETURN, false));
-            inputs.push(key(VK_RETURN, true));
-            continue;
-        }
-        if c == '\r' {
-            continue;
-        }
-        let mut units = [0u16; 2];
-        for unit in c.encode_utf16(&mut units) {
-            inputs.push(keyboard_input(VIRTUAL_KEY(0), *unit, KEYEVENTF_UNICODE));
-            inputs.push(keyboard_input(
-                VIRTUAL_KEY(0),
-                *unit,
-                KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-            ));
+        match c {
+            '\r' => continue,
+            '\n' => {
+                inputs.push(key(VK_RETURN, false));
+                inputs.push(key(VK_RETURN, true));
+            }
+            _ => {
+                let mut units = [0u16; 2];
+                for unit in c.encode_utf16(&mut units) {
+                    let down = keyboard_input(VIRTUAL_KEY(0), *unit, KEYEVENTF_UNICODE);
+                    let up =
+                        keyboard_input(VIRTUAL_KEY(0), *unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
+                    inputs.extend([down, up]);
+                }
+            }
         }
     }
     for batch in inputs.chunks(TYPE_BATCH) {

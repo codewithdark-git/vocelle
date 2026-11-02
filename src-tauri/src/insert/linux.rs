@@ -1,8 +1,14 @@
 //! Linux: simulated keys through enigo (X11, with experimental Wayland support).
+//!
+//! arboard can only read and write text and images here, so when the
+//! clipboard holds something else (files, say) the dictation is typed instead
+//! of pasted, leaving the clipboard untouched.
+
+use std::thread;
 
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
-use super::InsertError;
+use super::{InsertError, RESTORE_DELAY};
 use crate::hotkey;
 
 fn enigo() -> Result<Enigo, InsertError> {
@@ -18,18 +24,40 @@ pub fn check_target() -> Result<(), InsertError> {
     Ok(())
 }
 
-/// arboard can't list clipboard formats on Linux. If the clipboard holds
-/// something that isn't text (an image, files), reading text fails, and the
-/// dictation is typed instead of pasted.
-pub fn clipboard_is_text_only(clipboard: &mut arboard::Clipboard) -> bool {
-    match clipboard.get_text() {
-        Ok(_) => true,
-        Err(arboard::Error::ContentNotAvailable) => clipboard.get_image().is_err(),
-        Err(_) => false,
-    }
+enum Previous {
+    Empty,
+    Text(String),
+    Image(arboard::ImageData<'static>),
 }
 
-pub fn send_paste() -> Result<(), InsertError> {
+pub fn insert(text: &str) -> Result<(), InsertError> {
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| InsertError::Clipboard(e.to_string()))?;
+    let previous = match clipboard.get_text() {
+        Ok(text) => Previous::Text(text),
+        Err(arboard::Error::ContentNotAvailable) => match clipboard.get_image() {
+            Ok(image) => Previous::Image(image),
+            Err(arboard::Error::ContentNotAvailable) => Previous::Empty,
+            Err(_) => return type_text(text),
+        },
+        Err(_) => return type_text(text),
+    };
+
+    clipboard
+        .set_text(text)
+        .map_err(|e| InsertError::Clipboard(e.to_string()))?;
+    let sent = send_paste();
+
+    thread::sleep(RESTORE_DELAY);
+    let _ = match previous {
+        Previous::Text(prev) => clipboard.set_text(prev),
+        Previous::Image(image) => clipboard.set_image(image),
+        Previous::Empty => clipboard.clear(),
+    };
+    sent
+}
+
+fn send_paste() -> Result<(), InsertError> {
     let mut enigo = enigo()?;
     hotkey::while_injecting(|| {
         enigo
@@ -40,7 +68,7 @@ pub fn send_paste() -> Result<(), InsertError> {
     })
 }
 
-pub fn type_text(text: &str) -> Result<(), InsertError> {
+fn type_text(text: &str) -> Result<(), InsertError> {
     let mut enigo = enigo()?;
     hotkey::while_injecting(|| enigo.text(text).map_err(keystroke_error))
 }

@@ -1,9 +1,9 @@
 //! Puts transcribed text into whatever app has focus.
 //!
-//! Pasting is fast and works everywhere, so when the clipboard holds only text,
-//! the dictation is pasted and the previous text is put back. When it holds
-//! anything else (an image, files, formatted text), the dictation is typed
-//! instead, so the clipboard is never touched.
+//! Pasting is fast and works everywhere, so the dictation goes on the
+//! clipboard, Ctrl+V is sent, and the user's clipboard is put back afterwards.
+//! The platform modules decide how much of the clipboard they can preserve and
+//! fall back to typing the text when they can't.
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -15,10 +15,10 @@ use linux as platform;
 #[cfg(windows)]
 use windows as platform;
 
-use std::{thread, time::Duration};
+use std::time::Duration;
 
 /// How long to wait before restoring the clipboard. The target app reads the
-/// clipboard asynchronously after Ctrl+V; restoring too early pastes the old text.
+/// clipboard asynchronously after Ctrl+V; restoring too early pastes the old content.
 const RESTORE_DELAY: Duration = Duration::from_millis(250);
 
 #[derive(Debug)]
@@ -45,27 +45,5 @@ pub fn insert_text(text: &str) -> Result<(), InsertError> {
         return Ok(());
     }
     platform::check_target()?;
-
-    let mut clipboard =
-        arboard::Clipboard::new().map_err(|e| InsertError::Clipboard(e.to_string()))?;
-    if !platform::clipboard_is_text_only(&mut clipboard) {
-        return platform::type_text(text);
-    }
-
-    let previous = clipboard.get_text().ok();
-    clipboard
-        .set_text(text)
-        .map_err(|e| InsertError::Clipboard(e.to_string()))?;
-    let sent = platform::send_paste();
-
-    thread::sleep(RESTORE_DELAY);
-    match previous {
-        Some(prev) => {
-            let _ = clipboard.set_text(prev);
-        }
-        None => {
-            let _ = clipboard.clear();
-        }
-    }
-    sent
+    platform::insert(text)
 }
