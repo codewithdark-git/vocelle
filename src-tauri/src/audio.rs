@@ -113,9 +113,33 @@ impl Recording {
     /// Stops recording and returns 16 kHz mono samples.
     pub fn finish(self) -> Vec<f32> {
         drop(self.stream);
+        if let Some(samples) = test_audio() {
+            return samples;
+        }
         let raw = std::mem::take(&mut *self.samples.lock().unwrap());
         resample_linear(&raw, self.device_rate, TARGET_RATE)
     }
+}
+
+/// Debug builds started with `VOCELLE_TEST_AUDIO=clip.wav` (16 kHz mono 16-bit PCM)
+/// return that clip instead of the microphone, for end-to-end tests.
+fn test_audio() -> Option<Vec<f32>> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+    let path = std::env::var_os("VOCELLE_TEST_AUDIO")?;
+    let bytes = std::fs::read(path).ok()?;
+    // Find the "data" chunk; the header before it varies between writers.
+    let data = bytes.windows(4).position(|w| w == b"data")? + 8;
+    Some(
+        bytes
+            .get(data..)?
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|b| i16::from_le_bytes(*b) as f32 / i16::MAX as f32)
+            .collect(),
+    )
 }
 
 /// Shared state the audio callback writes into.
