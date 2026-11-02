@@ -35,9 +35,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/release-notes.mjs "$GITHUB_REF_NAME" > notes.md
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
-            --title "Vocelle ${GITHUB_REF_NAME#v}" --notes-file notes.md
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          # The create call returns the id directly; listing releases right
+          # after creating one can miss it.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="Vocelle ${GITHUB_REF_NAME#v}" \
+            -F body=@notes.md -F draft=true --jq .id)
+          if [ -z "$id" ]; then
+            echo "::error::Couldn't create the draft release"
+            exit 1
+          fi
           echo "release_id=$id" >> "$GITHUB_OUTPUT"
 
   build:
