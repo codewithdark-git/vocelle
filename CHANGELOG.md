@@ -61,6 +61,7 @@ first run.
 - Whisper could repeat a short phrase several times on some recordings.
 - Pressing the talk key while a long dictation was still being transcribed
   could be ignored.
+- The app logo was missing (a broken image) in installed builds since 0.2.0.
 
 ### Known limitations
 
