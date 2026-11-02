@@ -79,6 +79,6 @@ Every release ships installers for Windows (`.exe`) and Linux (`.deb`, `.AppImag
   only uploads to the release id it's given: the workflow creates the draft
   itself so the notes come from the changelog.
 - README screenshots live in `assets/screenshots/` (760×640 window at 2×).
-  Retake them when the Settings window changes noticeably.
+  Retake them when the app's look changes noticeably.
 - The installers aren't code-signed yet. Once a certificate is available, set
   `bundle.windows.certificateThumbprint` in `tauri.conf.json`.

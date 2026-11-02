@@ -42,22 +42,24 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="assets/screenshots/general.png" alt="General tab: speech model status, talk key and mode, microphone and language"></td>
-    <td width="50%"><img src="assets/screenshots/text.png" alt="Text tab: cleanup levels with a live preview, and the personal dictionary"></td>
+    <td width="50%"><img src="assets/screenshots/home.png" alt="Home: talk key banner, words dictated, time saved and recent dictations grouped by day"></td>
+    <td width="50%"><img src="assets/screenshots/welcome.png" alt="Welcome setup: first of five steps introducing Vocelle"></td>
   </tr>
   <tr>
-    <td align="center"><b>General</b>: talk key, mode, microphone</td>
+    <td align="center"><b>Home</b>: your stats and recent dictations</td>
+    <td align="center"><b>Welcome</b>: a two-minute guided setup</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/text.png" alt="Text: cleanup levels with a live preview, and the personal dictionary"></td>
+    <td><img src="assets/screenshots/models.png" alt="Models: six Whisper models with download and use buttons"></td>
+  </tr>
+  <tr>
     <td align="center"><b>Text</b>: cleanup with live preview, dictionary</td>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/models.png" alt="Models tab: six Whisper models with download and use buttons"></td>
-    <td><img src="assets/screenshots/history.png" alt="History tab: recent dictations with Copy and Delete"></td>
-  </tr>
-  <tr>
     <td align="center"><b>Models</b>: download and switch, all local</td>
-    <td align="center"><b>History</b>: copy back anything you said</td>
   </tr>
 </table>
+
+While you dictate, a small pill above the taskbar shows what's happening without any text: bars that move with your voice while listening, a wave of dots while transcribing, then a check mark.
 
 ## How it works
 
@@ -75,11 +77,12 @@ Everything in this chain runs on your computer. Voice detection skips silence, s
 
 | | |
 |---|---|
-| 🎙️ **Your talk key** | Hold to talk, or press once to start and again to stop. Right Ctrl by default; pick Caps Lock, an F-key and more. |
+| ⚡ **Fast** | Long dictations are transcribed while you're still talking, so text appears moments after you let go. |
+| 🎙️ **Your talk key** | Hold to talk, release to type. Right Ctrl by default; pick Caps Lock, an F-key and more. |
 | 🧠 **Local Whisper models** | Six models from Tiny (78 MB) to Large Turbo (574 MB). Vocelle recommends one for your computer. |
 | ✨ **Text cleanup** | Removes "um" and "uh", fixes stutters, spacing and capitals. Three levels, with a live preview. |
 | 📖 **Dictionary and replacements** | Teach Vocelle names and jargon, and set rules like "vocel" → "Vocelle". |
-| 🕘 **History** | Your last 200 dictations, text only, stored on your computer. Copy or delete any of them, or turn history off. |
+| 🏠 **Home** | Words dictated, time saved, and your last 200 dictations by day, text only and stored on your computer. Copy or delete any of them, or turn history off. |
 | 📋 **Clipboard safe** | Whatever you had copied (text, images, files, formatting) is put back after each dictation. |
 | 🤫 **Voice detection** | Silence and background noise aren't typed. |
 | 🌍 **21 languages** | Automatic language detection with multilingual models, or pick one. |
@@ -103,18 +106,18 @@ And a microphone.
      > The installer isn't code-signed yet, so Windows may show *"Windows protected your PC"*. Click **More info → Run anyway**.
    - **Debian / Ubuntu:** `Vocelle_x.y.z_amd64.deb`, then `sudo apt install ./Vocelle_x.y.z_amd64.deb`.
    - **Other Linux:** `Vocelle_x.y.z_amd64.AppImage`, then `chmod +x Vocelle_*.AppImage` and run it.
-2. **Open Settings.** Vocelle starts in the system tray (the purple sound-wave icon). Click it to open Settings.
-3. **Download a model.** On the **Models** tab, click **Download** next to the model tagged *Recommended for this PC*. The General tab shows *ready* when it's loaded.
-4. **Dictate.** Click into any text box, **hold Right Ctrl**, speak, and **release**. The indicator at the bottom of the screen shows *Listening → Transcribing → Done*, and your text appears at the cursor.
+2. **Follow the welcome setup.** On first launch Vocelle walks you through five short steps: check your microphone, download the speech model recommended for your computer, pick your talk key, and try a dictation.
+3. **Dictate anywhere.** Click into any text box, **hold Right Ctrl**, speak, and **release**. Your text appears at the cursor.
+
+Vocelle keeps running in the system tray (the orange sound-wave icon). Click it to open the app again; you can rerun the setup from **General → Setup guide**.
 
 ## Using Vocelle
 
-### Talk key and modes
+### Talk key
 
 On the **General** tab, choose a key from the list or click **Press a key…** and press the one you want. The change applies immediately.
 
-- **Hold to talk** (default): record while the key is held down. Pressing another key while holding it (for example Right Ctrl+C) cancels, so normal shortcuts keep working.
-- **Press to start, press to stop**: hands-free mode for longer dictation. Recordings stop on their own after 5 minutes.
+Hold the key while you speak and release it when you're done. Pressing another key while holding it (for example Right Ctrl+C) cancels, so normal shortcuts keep working. A quick tap is ignored, and recordings stop on their own after 5 minutes.
 
 Keys you can use: Right Ctrl, Left Ctrl, Right Shift, Caps Lock, Scroll Lock, Pause, Insert and F1–F12 (plus Menu and F13–F24 on Windows). Letters, digits and Space can't be used, because holding them would type characters. On Windows, a non-modifier talk key such as Caps Lock is reserved for Vocelle, so it won't also toggle caps.
 
@@ -135,16 +138,16 @@ Type in **Try it** to preview any level. Vocelle also adds a space after each di
 - **Dictionary:** one name or term per line (for example *Kubernetes* or *Dr. Okafor*). These are given to the speech model as spelling hints.
 - **Replacements:** whole-word rules applied to every dictation, not case-sensitive. Use them for words the model keeps getting wrong, or for shortcuts such as *"my email"* → *you@example.com*.
 
-### History
+### Home and history
 
-The **History** tab lists your last 200 dictations with the time and length of each. **Copy** puts one back on the clipboard; **Delete** or **Clear all** removes them. Turn history off on the General tab. Audio is never saved, only the final text.
+**Home** shows how many words you've dictated, roughly how much time that saved compared with typing at 40 words a minute, and your last 200 dictations grouped by day with the time and length of each. **Copy** puts one back on the clipboard; **Delete** or **Clear all** removes them. Turn history off on the General tab. Audio is never saved, only the final text.
 
 ## Choosing a model
 
 | Model | Size | Languages | Best for |
 |---|---|---|---|
-| Tiny (English) | 78 MB | English | Older or low-power computers; short phrases |
-| **Base (English)** | 148 MB | English | Most laptops; everyday dictation |
+| **Tiny (English)** | 78 MB | English | Fastest; recommended for 2- and 4-core laptops |
+| Base (English) | 148 MB | English | Fewer mistakes than Tiny; quick on 6+ core PCs |
 | Base (multilingual) | 148 MB | 99 languages | Like Base, for other languages |
 | Small (English) | 190 MB | English | Higher accuracy on a recent 4+ core CPU |
 | Small (multilingual) | 190 MB | 99 languages | Like Small, for other languages |
@@ -154,12 +157,12 @@ English-only models are faster and more accurate for English, and always transcr
 
 ## Configuration
 
-Everything is set from the Settings window, which saves automatically. The files live here:
+Everything is set in the app, which saves automatically. The files live here:
 
 | What | Windows | Linux |
 |---|---|---|
 | Settings | `%APPDATA%\com.codewithdark.vocelle\settings.json` | `~/.config/com.codewithdark.vocelle/settings.json` |
-| History | `%LOCALAPPDATA%\com.codewithdark.vocelle\history.json` | `~/.local/share/com.codewithdark.vocelle/history.json` |
+| History and totals | `%LOCALAPPDATA%\com.codewithdark.vocelle\history.json`, `stats.json` | `~/.local/share/com.codewithdark.vocelle/history.json`, `stats.json` |
 | Models | `%LOCALAPPDATA%\com.codewithdark.vocelle\models\` | `~/.local/share/com.codewithdark.vocelle/models/` |
 
 <details>
@@ -169,14 +172,14 @@ Everything is set from the Settings window, which saves automatically. The files
 {
   "model": "base.en",
   "talk_key": "ControlRight",
-  "talk_mode": "hold",
   "microphone": null,
   "language": "auto",
   "cleanup": "light",
   "trailing_space": true,
   "dictionary": ["Vocelle", "Kubernetes"],
   "replacements": [{ "from": "vocel", "to": "Vocelle" }],
-  "history": true
+  "history": true,
+  "onboarded": true
 }
 ```
 
@@ -184,7 +187,6 @@ Everything is set from the Settings window, which saves automatically. The files
 |---|---|---|
 | `model` | `tiny.en`, `base.en`, `base`, `small.en-q5_1`, `small-q5_1`, `large-v3-turbo-q5_0` | none until you download a model |
 | `talk_key` | A key code: `ControlRight`, `ControlLeft`, `ShiftRight`, `CapsLock`, `ScrollLock`, `Pause`, `Insert`, `ContextMenu`, `F1`–`F24` | `ControlRight` |
-| `talk_mode` | `hold`, `toggle` | `hold` |
 | `microphone` | A device name from the Settings list, or `null` for the system default | `null` |
 | `language` | `auto` or a language code (`en`, `es`, `fr`, `de`, `hi`, `ur`, `zh`, `ja`…) | `auto` |
 | `cleanup` | `off`, `light`, `full` | `light` |
@@ -192,6 +194,7 @@ Everything is set from the Settings window, which saves automatically. The files
 | `dictionary` | List of words and phrases | `[]` |
 | `replacements` | List of `{ "from": "…", "to": "…" }` | `[]` |
 | `history` | `true`, `false` | `true` |
+| `onboarded` | `true` once the welcome setup is finished or skipped | `false` |
 
 Missing keys get their defaults, so older settings files keep working. Edit the file only while Vocelle is closed; it's read at start-up.
 </details>
@@ -200,7 +203,7 @@ Missing keys get their defaults, so older settings files keep working. Edit the 
 
 - Audio is recorded only while you dictate, is processed in memory, and is never saved to disk.
 - Transcription runs entirely on your computer. The only network requests Vocelle makes are the model downloads you start in Settings, from `huggingface.co`.
-- History stores text only, on your computer, and can be turned off or cleared.
+- History stores text only, on your computer, and can be turned off or cleared. The Home totals are just counts (dictations, words, seconds).
 - On Windows, dictated text is kept out of clipboard history (Win+V) and cloud clipboard sync.
 - No accounts, analytics or telemetry.
 
@@ -210,7 +213,7 @@ Missing keys get their defaults, so older settings files keep working. Edit the 
 <summary><b>Nothing happens when I press the talk key</b></summary>
 
 - Make sure Vocelle is running (look for the tray icon).
-- Open Settings and check that the General tab shows the model as *ready*.
+- Open Vocelle and check that the bottom of the sidebar shows the model as *ready*.
 - Check which key and mode are set on the General tab.
 - Some keyboards and remote-desktop tools remap Right Ctrl. Try Caps Lock or an F-key instead.
 </details>
@@ -242,7 +245,7 @@ Add it to the **Dictionary** on the Text tab. If it still comes out wrong, add a
 <details>
 <summary><b>Transcription is slow</b></summary>
 
-Switch to a smaller model: *Base (English)* or *Tiny (English)*. Closing CPU-heavy apps also helps.
+Switch to *Tiny (English)*, the fastest model. Closing CPU-heavy apps also helps.
 </details>
 
 <details>
@@ -278,7 +281,7 @@ No. Recording, transcription and cleanup all happen on your computer. See [Priva
 <details>
 <summary><b>Which model should I use?</b></summary>
 
-Start with the one marked *Recommended for this PC*. If dictation feels slow, try a smaller model; if words come out wrong, try a bigger one. English-only models are the better choice when you only dictate in English.
+Start with the one marked *Recommended*: Vocelle picks it for speed on your computer. If dictation feels slow, try a smaller model; if words come out wrong, try a bigger one. English-only models are the better choice when you only dictate in English.
 </details>
 
 <details>
