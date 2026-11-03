@@ -25,6 +25,7 @@ export interface Stats {
   dictations: number;
   words: number;
   seconds: number;
+  recent_speed: number[];
 }
 
 export interface TalkKey {

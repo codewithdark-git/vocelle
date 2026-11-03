@@ -1,8 +1,13 @@
 // Home page: greeting, totals and recent dictations grouped by day.
+import { listen } from "@tauri-apps/api/event";
+
 import { api, el, showError, type HistoryEntry, type Stats } from "./api";
 
 /** Typing speed used to estimate time saved; a common average for typists. */
 const TYPING_WPM = 40;
+/** Transcription seconds per audio second above which dictation feels slow. */
+const SLOW_SPEED = 0.3;
+const FAST_MODEL = "tiny.en";
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -60,7 +65,10 @@ export async function refreshHome(enabled = historyEnabled): Promise<void> {
   historyEnabled = enabled;
   $("greeting").textContent = greeting();
 
-  const stats = await api.getStats().catch((): Stats => ({ dictations: 0, words: 0, seconds: 0 }));
+  const stats = await api
+    .getStats()
+    .catch((): Stats => ({ dictations: 0, words: 0, seconds: 0, recent_speed: [] }));
+  void renderSlowNotice(stats);
   $("stat-words").textContent = stats.words.toLocaleString();
   $("stat-saved").textContent = formatDuration(minutesSaved(stats));
   $("stat-count").textContent = stats.dictations.toLocaleString();
@@ -82,7 +90,50 @@ export async function refreshHome(enabled = historyEnabled): Promise<void> {
   ($("clear-history") as HTMLButtonElement).hidden = entries.length === 0;
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+/** Suggests the fastest model when recent dictations were slow. */
+async function renderSlowNotice(stats: Stats): Promise<void> {
+  const notice = $("slow-notice");
+  const slow = stats.recent_speed.length >= 3 && median(stats.recent_speed) > SLOW_SPEED;
+  const models = slow ? await api.listModels().catch(() => []) : [];
+  const active = models.find((m) => m.selected);
+  notice.hidden = !slow || !active || active.id === FAST_MODEL;
+}
+
+async function switchToFastModel(): Promise<void> {
+  const button = $("use-tiny") as HTMLButtonElement;
+  const tiny = (await api.listModels()).find((m) => m.id === FAST_MODEL);
+  if (!tiny) return;
+  button.disabled = true;
+  if (!tiny.downloaded) {
+    button.textContent = "Downloading…";
+    let finished: (error: string | null) => void = () => {};
+    const done = new Promise<string | null>((resolve) => (finished = resolve));
+    const unlisten = await listen<{ id: string; error: string | null }>("model-downloaded", ({ payload }) => {
+      if (payload.id === FAST_MODEL) finished(payload.error);
+    });
+    await api.downloadModel(FAST_MODEL).catch((err) => finished(String(err)));
+    const error = await done;
+    unlisten();
+    if (error) {
+      showError(error);
+      button.disabled = false;
+      button.textContent = "Use Tiny";
+      return;
+    }
+  }
+  await api.selectModel(FAST_MODEL).catch((err) => showError(String(err)));
+  $("slow-notice").hidden = true;
+  button.disabled = false;
+  button.textContent = "Use Tiny";
+}
+
 export function initHome(): void {
+  $("use-tiny").onclick = () => void switchToFastModel();
   $("clear-history").onclick = async () => {
     if (!confirm("Delete all saved dictations? This can't be undone.")) return;
     await api.clearHistory();

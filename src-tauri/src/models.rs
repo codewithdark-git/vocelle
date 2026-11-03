@@ -53,7 +53,7 @@ pub const CATALOG: &[ModelInfo] = &[
     whisper_model!(
         "tiny.en",
         "Tiny (English)",
-        "Fastest. Good everyday dictation, best on 2- and 4-core laptops.",
+        "Fastest, a little less accurate. Best for slow or older PCs.",
         true,
         "ggml-tiny.en.bin",
         77_704_715,
@@ -62,7 +62,7 @@ pub const CATALOG: &[ModelInfo] = &[
     whisper_model!(
         "base.en",
         "Base (English)",
-        "Fewer mistakes than Tiny and still quick on 6+ core PCs.",
+        "Accurate and quick on most laptops. The best place to start.",
         true,
         "ggml-base.en.bin",
         147_964_211,
@@ -124,14 +124,16 @@ pub fn find(id: &str) -> Option<&'static ModelInfo> {
 
 /// Picks a default model from the CPU thread count. A quick heuristic until
 /// first-run benchmarking exists.
-/// Dictation should feel instant, so this favours speed: measured on a
-/// 2-core/4-thread laptop, Tiny transcribes 3 s of speech in about 0.6 s and
-/// Base in about 1.2 s. Large Turbo is never the default on a CPU.
+/// Balances speed and accuracy. On a 2-core/4-thread laptop, Base finished
+/// 0.5–2.3 s after release on realistic 8–25 s dictations (with transcribing
+/// ahead) and was clearly more accurate than Tiny, so Tiny is only the default
+/// on 2-thread machines; Home suggests it when dictation is measurably slow.
+/// Large Turbo is never the default on a CPU.
 pub fn recommended() -> &'static ModelInfo {
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
     let id = match threads {
-        0..=4 => "tiny.en",
-        5..=11 => "base.en",
+        0..=2 => "tiny.en",
+        3..=11 => "base.en",
         _ => "small.en-q5_1",
     };
     find(id).expect("recommended model is in the catalog")

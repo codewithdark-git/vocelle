@@ -950,6 +950,24 @@ input[role="switch"]:checked::after {
 
 /* ---------- Home ---------- */
 
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+}
+
+.notice p {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
