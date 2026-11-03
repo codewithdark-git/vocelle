@@ -6,6 +6,36 @@ All notable changes to Vocelle are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-03
+
+Fixes slow and inaccurate dictation in 0.3.0 on real microphones and busy or
+power-saving laptops.
+
+### Fixed
+
+- **Dictation could take 10–20 seconds** on a slow or power-saving laptop.
+  Whisper retried unclear audio up to five more times; on a throttled CPU one
+  8-second test clip took over 100 s. Retries are off now; the same clip
+  takes about 2 s.
+- **Words broken at the seams of long dictations** ("buy groceries" came out
+  as "Microceries"). Long dictations are now only split at real pauses of
+  half a second or more, into parts of at least 6 seconds, and only once the
+  recording is longer than 8 seconds. Shorter dictations are transcribed in
+  one piece, as in 0.1.
+- Starting Vocelle does less work (a 3-second warm-up instead of 10), which
+  helps on battery.
+
+### Changed
+
+- **Base (English) is recommended again on 4-thread laptops**; it's clearly
+  more accurate than Tiny. Tiny is recommended on 2-thread machines.
+- **Home suggests a faster model** with one click when recent dictations were
+  slow, and explains that plugging in or the Best performance power mode
+  helps.
+- **A log file** (`vocelle.log` next to your history) records how long each
+  step of a dictation took, so slow dictations can be diagnosed. It never
+  contains what you said.
+
 ## [0.3.0] - 2026-11-03
 
 Faster dictation, a new look in the Vocelle brand colours, and a guided
@@ -151,7 +181,8 @@ transcribed entirely on your PC.
   dictating are cleared.
 - The talk key can't be changed yet.
 
-[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/codewithdark-git/vocelle/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/codewithdark-git/vocelle/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codewithdark-git/vocelle/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/codewithdark-git/vocelle/releases/tag/v0.1.0
