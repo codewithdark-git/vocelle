@@ -3,196 +3,354 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vocelle: offline voice typing for Windows</title>
-  <meta name="description" content="Hold Right Ctrl, say it, release. Vocelle types your words into any app on Windows, transcribed offline on your own PC.">
+  <title>Vocelle: private voice typing for Windows and Linux</title>
+  <meta name="description" content="Hold a key, say it, let go. Vocelle types your words into any app, transcribed offline on your own computer. Free, private, no account.">
   <meta name="theme-color" content="#FF5A1F">
   <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="Vocelle: hold a key, say it, it's typed">
-  <meta property="og:description" content="Offline voice typing for Windows. Your voice stays on your PC.">
+  <meta property="og:description" content="Private voice typing for Windows and Linux. Your voice never leaves your computer.">
   <meta property="og:image" content="https://codewithdark-git.github.io/vocelle/assets/demo-poster.jpg">
   <meta name="twitter:card" content="summary_large_image">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,400..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,400..900&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="nav">
-    <div class="wrap nav-inner">
+    <div class="nav-pill">
       <a class="brand" href="#top" aria-label="Vocelle home">
-        <img src="assets/logo-mark.svg" alt="" width="34" height="34">
+        <img src="assets/logo-mark.svg" alt="" width="30" height="30">
         <span>Vocelle</span>
       </a>
       <nav class="nav-links" aria-label="Main">
         <a href="#how">How it works</a>
+        <a href="#speed">Speed</a>
+        <a href="#privacy">Privacy</a>
         <a href="#features">Features</a>
-        <a href="#requirements">Requirements</a>
-        <a href="#faq">Questions</a>
+        <a href="#faq">FAQ</a>
       </nav>
       <a class="btn btn-ink btn-small js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download</a>
     </div>
   </header>
 
   <main id="top">
+    <!-- Hero -->
     <section class="hero">
       <div class="wrap hero-inner">
-        <div class="hero-copy">
-          <h1><span>Hold a key.</span> <span>Say it.</span> <span>It's typed.</span></h1>
-          <p class="lede">Vocelle turns your voice into text in any app on Windows. Speech recognition runs offline, on your own PC, so nothing you say leaves it.</p>
-          <div class="cta">
-            <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download for Windows</a>
-            <p class="cta-meta">Version <span class="js-version">0.3.2</span>, <span class="js-size">2.1 MB</span>.<br>Windows 10 and 11, 64-bit.<br>Also on <a href="https://github.com/codewithdark-git/vocelle/releases/latest">Linux</a> (.deb and AppImage, preview).</p>
-          </div>
+        <p class="eyebrow reveal">Free voice typing for Windows and Linux</p>
+        <h1 class="display reveal">Hold a key. <em>Say it.</em><br>It's typed.</h1>
+        <p class="lede reveal">Vocelle turns your voice into clean text in any app, transcribed on your own computer. No account, no cloud, no word limits.</p>
+        <div class="cta reveal">
+          <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download for Windows</a>
+          <a class="btn btn-ghost btn-large" href="#how">See how it works</a>
         </div>
+        <p class="cta-meta reveal">Version <span class="js-version">0.3.2</span> · <span class="js-size">2.1 MB</span> · Windows 10 and 11 · also on <a href="https://github.com/codewithdark-git/vocelle/releases/latest">Linux</a></p>
 
-        <div class="try" aria-label="Try the talk key">
+        <div class="try reveal" aria-label="Try the talk key">
           <div class="try-field" aria-live="polite">
             <span class="try-text js-try-text"></span><span class="caret" aria-hidden="true"></span>
-            <span class="try-hint js-try-hint">Your words will appear here.</span>
-          </div>
-          <div class="wave js-wave" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <span class="try-hint js-try-hint">Hold the key below, then let go. Your words appear here.</span>
           </div>
           <div class="try-controls">
             <button class="keycap js-key" type="button" aria-describedby="try-status">Right Ctrl</button>
-            <p id="try-status" class="try-status js-status">Hold the key to try it, then let go.</p>
+            <div class="pill js-try-pill" data-phase="idle" aria-hidden="true">
+              <span class="pill-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="pill-dots"><i></i><i></i><i></i></span>
+              <svg class="pill-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+            </div>
+          </div>
+          <p id="try-status" class="try-status js-status">Press and hold. Works with your keyboard's Right Ctrl too.</p>
+        </div>
+      </div>
+
+      <div class="ticker" aria-hidden="true">
+        <div class="ticker-track">
+          <span>"Can we move the review to Thursday at three?"</span>
+          <span>"Thanks, the draft looks great, two small notes below."</span>
+          <span>"Remind me to call the dentist tomorrow at ten."</span>
+          <span>"Ship it once the Linux build is green."</span>
+          <span>"I'm running ten minutes late, start without me."</span>
+          <span>"Can we move the review to Thursday at three?"</span>
+          <span>"Thanks, the draft looks great, two small notes below."</span>
+          <span>"Remind me to call the dentist tomorrow at ten."</span>
+          <span>"Ship it once the Linux build is green."</span>
+          <span>"I'm running ten minutes late, start without me."</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works: a pinned scene driven by scroll -->
+    <section id="how" class="story js-scene" style="--steps: 3">
+      <div class="story-sticky">
+        <div class="wrap story-inner">
+          <div class="story-copy">
+            <p class="eyebrow">How it works</p>
+            <ol class="story-steps">
+              <li data-step="0">
+                <span class="step-num">01</span>
+                <h2>Hold your talk key.</h2>
+                <p>Right Ctrl by default, or any key you choose. A small pill appears above the taskbar. It never steals focus from what you're writing.</p>
+              </li>
+              <li data-step="1">
+                <span class="step-num">02</span>
+                <h2>Talk like you would to a person.</h2>
+                <p>Pause, think, say "um". Vocelle listens on your computer and starts transcribing finished sentences while you're still talking.</p>
+              </li>
+              <li data-step="2">
+                <span class="step-num">03</span>
+                <h2>Let go. It's typed.</h2>
+                <p>Clean text appears at your cursor a moment later, filler words removed, and whatever you'd copied is still on your clipboard.</p>
+              </li>
+            </ol>
+          </div>
+
+          <div class="stage" aria-hidden="true">
+            <div class="window">
+              <div class="window-bar"><i></i><i></i><i></i><span>New message</span></div>
+              <div class="window-body">
+                <div class="mail-row"><b>To</b> Sarah</div>
+                <div class="mail-row"><b>Subject</b> Onboarding proposal</div>
+                <p class="mail-text"><span class="js-mail-text"></span><span class="caret"></span></p>
+              </div>
+            </div>
+            <div class="spoken js-spoken">
+              <span>hey sarah</span><span class="filler">um</span><span>the proposal</span><span>looks solid</span><span class="filler">uh</span><span>can we</span><span>simplify</span><span>step two</span>
+            </div>
+            <div class="stage-key js-stage-key">Right Ctrl</div>
+            <div class="pill pill-stage js-stage-pill" data-phase="idle">
+              <span class="pill-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="pill-dots"><i></i><i></i><i></i></span>
+              <svg class="pill-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="film">
+    <!-- Speed -->
+    <section id="speed" class="speed js-reveal-group">
       <div class="wrap">
-        <video src="assets/demo.mp4" poster="assets/demo-poster.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Demo: a long prompt is wiped away, Right Ctrl is pressed, and a spoken sentence is typed on screen."></video>
-        <p class="film-caption">Long prompts were a workaround. Talking is the interface you already know.</p>
+        <p class="eyebrow eyebrow-light reveal">Speed</p>
+        <h2 class="section-title reveal">You talk <em>three times</em> faster than you type.</h2>
+        <p class="section-lede reveal">Most people speak around 130–160 words a minute and type around 40. Vocelle keeps up, then gets out of the way.</p>
+        <div class="race js-race">
+          <div class="lane">
+            <div class="lane-head"><span>Typing</span><b><span class="js-count" data-to="40">0</span> wpm</b></div>
+            <div class="lane-track"><div class="lane-fill" style="--to: 0.25"></div></div>
+          </div>
+          <div class="lane lane-voice">
+            <div class="lane-head"><span>Talking to Vocelle</span><b><span class="js-count" data-to="150">0</span> wpm</b></div>
+            <div class="lane-track"><div class="lane-fill" style="--to: 0.94"></div></div>
+          </div>
+        </div>
+        <div class="speed-facts reveal">
+          <div><b>~1 s</b><span>from letting go to text, on a typical laptop</span></div>
+          <div><b>0</b><span>words-per-week limits</span></div>
+          <div><b>$0</b><span>to use, no subscription</span></div>
+        </div>
       </div>
     </section>
 
-    <section id="how" class="how">
+    <!-- Works everywhere -->
+    <section class="apps">
       <div class="wrap">
-        <h2>Three steps, every time</h2>
-        <ol class="steps">
-          <li>
-            <span class="step-num">1</span>
-            <h3>Hold Right Ctrl</h3>
-            <p>Click into any text box first. A small indicator at the bottom of the screen shows Vocelle is listening.</p>
-          </li>
-          <li>
-            <span class="step-num">2</span>
-            <h3>Say what you mean</h3>
-            <p>Talk the way you would to a person. Silence and background noise aren't typed.</p>
-          </li>
-          <li>
-            <span class="step-num">3</span>
-            <h3>Let go</h3>
-            <p>Your words appear at the cursor, and whatever was on your clipboard is put back.</p>
-          </li>
-        </ol>
+        <h2 class="section-title reveal">Types anywhere <em>you</em> can type.</h2>
+        <p class="section-lede reveal">If an app has a text cursor and accepts paste, Vocelle can type into it.</p>
+      </div>
+      <div class="marquee" aria-label="Works in email, chat, documents, code editors and browsers">
+        <div class="marquee-track" aria-hidden="true">
+          <span>Email</span><span>Slack</span><span>Microsoft Word</span><span>Google Docs</span><span>VS Code</span><span>Notion</span><span>Teams</span><span>ChatGPT</span><span>Notepad</span><span>Browsers</span>
+          <span>Email</span><span>Slack</span><span>Microsoft Word</span><span>Google Docs</span><span>VS Code</span><span>Notion</span><span>Teams</span><span>ChatGPT</span><span>Notepad</span><span>Browsers</span>
+        </div>
+        <div class="marquee-track reverse" aria-hidden="true">
+          <span>Prompts</span><span>Meeting notes</span><span>Replies</span><span>Commit messages</span><span>Essays</span><span>Tickets</span><span>Journals</span><span>Docs</span><span>Comments</span><span>Lists</span>
+          <span>Prompts</span><span>Meeting notes</span><span>Replies</span><span>Commit messages</span><span>Essays</span><span>Tickets</span><span>Journals</span><span>Docs</span><span>Comments</span><span>Lists</span>
+        </div>
       </div>
     </section>
 
+    <!-- Privacy: a scroll-driven scene -->
+    <section id="privacy" class="privacy js-scene" style="--steps: 1">
+      <div class="privacy-sticky">
+        <div class="wrap privacy-inner">
+          <div class="privacy-copy">
+            <p class="eyebrow">Privacy</p>
+            <h2 class="section-title">Your voice <em>never leaves</em> your computer.</h2>
+            <p class="section-lede">Speech recognition runs on your own processor with open-source Whisper models. Audio lives in memory for a moment and is never saved or sent. No account, no analytics, no telemetry.</p>
+            <ul class="ticks">
+              <li>Works with Wi-Fi off, after a one-time model download</li>
+              <li>Models are checked with SHA-256 before use</li>
+              <li>Dictated text stays out of Windows clipboard history</li>
+            </ul>
+          </div>
+          <svg class="privacy-art" viewBox="0 0 420 340" aria-hidden="true">
+            <g class="cloud">
+              <path d="M300 92c0-22 18-40 40-40 18 0 33 12 38 28 16 1 28 14 28 30 0 17-14 30-31 30h-74c-18 0-33-15-33-33 0-17 14-31 32-31z"/>
+              <line class="cloud-cross" x1="292" y1="58" x2="410" y2="150"/>
+            </g>
+            <path class="beam" d="M60 90 C 120 90, 140 170, 205 190"/>
+            <g class="mouth">
+              <circle cx="46" cy="90" r="22"/>
+              <path d="M40 82a10 10 0 0 1 0 16M46 77a16 16 0 0 1 0 26"/>
+            </g>
+            <g class="laptop">
+              <rect x="120" y="150" width="200" height="130" rx="12"/>
+              <rect class="screen" x="134" y="164" width="172" height="102" rx="6"/>
+              <path d="M96 288h248l-16 22H112z"/>
+            </g>
+            <g class="screen-wave">
+              <rect x="174" y="205" width="8" height="24" rx="4"/>
+              <rect x="190" y="195" width="8" height="44" rx="4"/>
+              <rect x="206" y="187" width="8" height="60" rx="4"/>
+              <rect x="222" y="195" width="8" height="44" rx="4"/>
+              <rect x="238" y="205" width="8" height="24" rx="4"/>
+            </g>
+            <g class="lock">
+              <rect x="344" y="226" width="44" height="36" rx="8"/>
+              <path d="M354 226v-10a12 12 0 0 1 24 0v10"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cleanup -->
+    <section class="cleanup js-scene" style="--steps: 1">
+      <div class="cleanup-sticky">
+        <div class="wrap">
+          <p class="eyebrow">Text cleanup</p>
+          <h2 class="section-title">Reads like <em>you typed it.</em></h2>
+          <p class="cleanup-text" aria-label="So I think the plan works for Friday. I'll send it tonight.">
+            <span class="x" aria-hidden="true">um,&nbsp;</span><span class="cap" aria-hidden="true" data-from="so" data-to="So">so</span> <span class="cap" aria-hidden="true" data-from="i" data-to="I">i</span> think <span class="x" aria-hidden="true">the&nbsp;</span>the plan works<span class="x" aria-hidden="true">, uh,</span> for Friday. <span class="cap" aria-hidden="true" data-from="i'll" data-to="I'll">i'll</span> send it tonight.
+          </p>
+          <p class="section-lede">Fillers, stutters, spacing and capitals are fixed as you dictate. Add names to your dictionary and Vocelle spells them your way.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
     <section id="features" class="features">
-      <div class="wrap features-inner">
-        <h2>Spend your words on the work, not the prompt.</h2>
-        <dl class="feature-list">
-          <div>
-            <dt>Works offline</dt>
-            <dd>Open-source Whisper models run on your PC. After the one-time model download, you don't need an internet connection.</dd>
-          </div>
-          <div>
-            <dt>Private by design</dt>
-            <dd>Audio is processed in memory and never saved or sent anywhere. No account, analytics or telemetry.</dd>
-          </div>
-          <div>
-            <dt>Types into any app</dt>
-            <dd>Word, Chrome, Slack, Teams, VS Code, Notepad. If it has a text cursor, Vocelle can type into it.</dd>
-          </div>
-          <div>
-            <dt>Stays out of your way</dt>
-            <dd>It lives in the system tray, and its indicator never takes focus from the window you're typing in.</dd>
-          </div>
-          <div>
-            <dt>Sized for your PC</dt>
-            <dd>Choose from six models, from Tiny (78 MB) to Large Turbo (574 MB). Vocelle recommends one for your hardware.</dd>
-          </div>
-          <div>
-            <dt>Checked downloads</dt>
-            <dd>Models come from the official whisper.cpp repositories and are verified with SHA-256 before use.</dd>
-          </div>
-        </dl>
+      <div class="wrap">
+        <h2 class="section-title reveal">Everything you need, <em>nothing you don't.</em></h2>
+        <div class="feature-grid">
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">⌨</span>
+            <h3>Your talk key</h3>
+            <p>Right Ctrl, Caps Lock, an F-key: pick the one that suits your hands. Shortcuts that use it keep working.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">✦</span>
+            <h3>Personal dictionary</h3>
+            <p>Teach it names and jargon, and set replacements like "my email" → your address.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">◷</span>
+            <h3>Home and history</h3>
+            <p>See words dictated and time saved, and copy back anything you said. Text only, on your computer.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">◎</span>
+            <h3>Six speech models</h3>
+            <p>From Tiny (78 MB) to Large Turbo. Vocelle recommends one for your computer and suggests a faster one if it's slow.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">✺</span>
+            <h3>21 languages</h3>
+            <p>English-only models for speed, multilingual ones for 99 languages with automatic detection.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-icon" aria-hidden="true">◐</span>
+            <h3>Guided setup</h3>
+            <p>A two-minute welcome checks your microphone, downloads the right model and lets you practise.</p>
+          </article>
+        </div>
       </div>
     </section>
 
-    <section id="requirements" class="reqs">
-      <div class="wrap reqs-inner">
+    <!-- Get it -->
+    <section id="download" class="get">
+      <div class="wrap get-inner">
         <div>
-          <h2>What you need</h2>
-          <ul class="checklist">
-            <li>Windows 10 (version 1903 or later) or Windows 11, 64-bit</li>
-            <li>A CPU with AVX2: Intel 4th generation (2013) or newer, or AMD Ryzen</li>
-            <li>4 GB of RAM, or 8 GB for the larger models</li>
-            <li>A microphone</li>
-            <li>About 200 MB of disk space with a small model</li>
-          </ul>
+          <h2 class="section-title reveal">Up and running in <em>two minutes.</em></h2>
+          <ol class="get-steps reveal">
+            <li><b>Download</b> the installer and run it. It isn't code-signed yet, so if Windows says <em>"Windows protected your PC"</em>, choose <b>More info → Run anyway</b>.</li>
+            <li><b>Follow the welcome setup:</b> check your microphone and download the recommended model.</li>
+            <li><b>Hold your talk key</b> in any app and start talking.</li>
+          </ol>
         </div>
-        <aside class="note">
-          <h3>Installing for the first time</h3>
-          <p>The installer isn't code-signed yet, so Windows may say <em>"Windows protected your PC"</em>. Click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
-          <p>Vocelle opens in the system tray. Open Settings, download the model marked <em>Recommended</em>, and you're ready to talk.</p>
+        <aside class="reqs reveal">
+          <h3>What you need</h3>
+          <ul>
+            <li>Windows 10 (1903+) or 11, 64-bit, or a Linux desktop with X11</li>
+            <li>A processor with AVX2 (Intel 2013+ or AMD Ryzen)</li>
+            <li>4 GB of memory (8 GB for the largest models)</li>
+            <li>About 200 MB of disk space and a microphone</li>
+          </ul>
+          <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download for Windows</a>
+          <p class="cta-meta"><a href="https://github.com/codewithdark-git/vocelle/releases/latest">Linux .deb and AppImage</a> · <a href="https://github.com/codewithdark-git/vocelle/releases">All releases</a></p>
         </aside>
       </div>
     </section>
 
+    <!-- FAQ -->
     <section id="faq" class="faq">
       <div class="wrap faq-inner">
-        <h2>Questions</h2>
+        <h2 class="section-title reveal">Good <em>questions.</em></h2>
         <div class="faq-list">
           <details>
-            <summary>Does Vocelle send my voice to the cloud?</summary>
-            <p>No. Transcription runs entirely on your PC. The only network requests Vocelle makes are the model downloads you start in Settings.</p>
+            <summary>Does Vocelle send my voice anywhere?</summary>
+            <p>No. Recording, transcription and cleanup all happen on your computer. The only network requests are the model downloads you start yourself.</p>
+          </details>
+          <details>
+            <summary>Is it really free?</summary>
+            <p>Yes. Dictation is free and unlimited, with no account. A Pro plan with optional AI rewriting is planned; everything that's free today stays free.</p>
+          </details>
+          <details>
+            <summary>How fast is it?</summary>
+            <p>On a typical laptop, text appears about a second after you let go, even after long dictations, because finished sentences are transcribed while you're still talking. On battery, Windows may slow your processor; plugging in helps.</p>
           </details>
           <details>
             <summary>Which languages does it understand?</summary>
-            <p>The English-only models are the fastest and most accurate for English. The multilingual models cover 99 languages.</p>
+            <p>English-only models are the fastest and most accurate for English. Multilingual models cover 99 languages, and you can choose from 21 in Settings or let Vocelle detect it.</p>
           </details>
           <details>
             <summary>Can I change the talk key?</summary>
-            <p>Not yet. The talk key is Right Ctrl in this release, and a configurable key is planned for the next one.</p>
+            <p>Yes. Pick Right Ctrl, Left Ctrl, Right Shift, Caps Lock, an F-key and more in General, or click <em>Press a key…</em>.</p>
           </details>
           <details>
-            <summary>Nothing happens when I hold Right Ctrl.</summary>
-            <p>Check that Vocelle is running in the tray and that a model shows <em>ready</em> in Settings. Some keyboards and remote-desktop tools remap Right Ctrl.</p>
-          </details>
-          <details>
-            <summary>How do I uninstall it?</summary>
-            <p>Open Windows Settings, go to Apps, then Installed apps, find Vocelle and choose Uninstall.</p>
+            <summary>Does it work on Mac?</summary>
+            <p>Not yet. Vocelle runs on Windows 10 and 11, with a Linux preview for X11 desktops.</p>
           </details>
         </div>
       </div>
     </section>
 
+    <!-- Final call to action -->
     <section class="final">
       <div class="wrap final-inner">
-        <h2>Just say it.</h2>
-        <div class="cta">
-          <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download for Windows</a>
-          <p class="cta-meta">Early preview. No account needed.</p>
+        <h2 class="display reveal">Stop typing. <em>Start talking.</em></h2>
+        <div class="cta reveal">
+          <a class="btn btn-ink btn-large js-download" href="https://github.com/codewithdark-git/vocelle/releases/download/v0.3.2/Vocelle_0.3.2_x64-setup.exe">Download Vocelle</a>
         </div>
+        <p class="cta-meta reveal">Free · Private · No account</p>
       </div>
     </section>
   </main>
 
   <footer class="footer">
     <div class="wrap footer-inner">
-      <span>© <span class="js-year">2026</span> Vocelle</span>
+      <a class="brand" href="#top"><img src="assets/logo-mark.svg" alt="" width="26" height="26"><span>Vocelle</span></a>
       <nav aria-label="Footer">
         <a href="https://github.com/codewithdark-git/vocelle">Source on GitHub</a>
         <a href="https://github.com/codewithdark-git/vocelle/blob/main/CHANGELOG.md">Changelog</a>
         <a href="https://github.com/codewithdark-git/vocelle/releases">All releases</a>
+        <a href="https://github.com/codewithdark-git/vocelle/blob/main/SECURITY.md">Security</a>
       </nav>
+      <span>© <span class="js-year">2026</span> Vocelle</span>
     </div>
   </footer>
 
