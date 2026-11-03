@@ -84,18 +84,21 @@ A dictation goes through these steps:
    so the user meant a shortcut such as Right Ctrl+C).
 2. **Recording.** `audio.rs` captures the chosen microphone with cpal and
    resamples it to 16 kHz mono in memory. Nothing is written to disk.
-3. **Transcribing ahead.** While the key is held, `dictation.rs` checks the
-   audio every 0.8 s. Once 3 s or more is untranscribed, voice detection finds
-   a pause between phrases and the part before it is transcribed in the
-   background. On release only the rest is left, so long dictations finish
-   about as fast as short ones.
+3. **Transcribing ahead.** Once a recording is longer than 8 s,
+   `dictation.rs` checks the audio every 0.8 s. When 6 s or more is
+   untranscribed, voice detection looks for a pause of at least 0.5 s and the
+   part before it is transcribed in the background. On release only the rest
+   is left. Shorter dictations are transcribed in one piece, which is the most
+   accurate; cutting at shorter pauses broke words in testing.
 4. **Transcription.** `asr.rs` keeps the model, one reusable Whisper state and
-   the Silero voice detector loaded, and warms them up at load. Voice
+   the Silero voice detector loaded, and warms them up at load (3 s of silence). Voice
    detection trims silence (and skips Whisper when nobody spoke); the encoder
    window is sized to the clip, with a floor of 384 frames because smaller
    windows make Whisper repeat itself. Flash attention is on, threads are all
    logical cores up to 8, and output is capped relative to the clip length.
-   A sentence repeated back to back is dropped. Dictionary words go into the
+   A sentence repeated back to back is dropped. Temperature-fallback retries
+   are off: on unclear audio and a throttled CPU they took over 100 s for an
+   8 s clip. Dictionary words go into the
    initial prompt.
 5. **Cleanup.** `cleanup.rs` applies replacements, then the chosen cleanup level.
 6. **Insertion.** `insert/` takes a snapshot of the whole clipboard, pastes the
@@ -134,6 +137,14 @@ scripts/                Version and release-notes helpers
 docs/                   Developer and release documentation
 ```
 
+## Logs
+
+`log.rs` writes timings to `vocelle.log` in the app's local data folder (capped
+at 256 KB, then rotated to `vocelle.old.log`). Each dictation adds one line:
+audio length, peak level, parts, model, the wait for a part in progress, the
+last part's time, insert time, time from release to ready, and seconds of
+work per second of audio. Never log dictated text.
+
 ## Testing
 
 **Unit tests** run with `npm run check` (or `cargo test` in `src-tauri`). They
@@ -157,6 +168,16 @@ VOCELLE_TEST_MODEL=path/to/ggml-base.en.bin VOCELLE_TEST_WAV="a.wav;b.wav" \
 - `VOCELLE_TEST_DICTATE=<ms>` holds the talk key for that long once the
   model is ready, without touching the real keyboard.
 - `VOCELLE_TEST_NO_INSERT=1` logs the final text instead of pasting it.
+
+Test with realistic audio, not just clean text-to-speech: add silence before
+and after, background noise, a quieter voice and overlapping speech. Clean
+clips never trigger Whisper's slow paths. To run a test copy next to an
+installed Vocelle, build it under another identifier so it has its own
+settings and data:
+
+```bash
+TAURI_CONFIG='{"identifier":"com.codewithdark.vocelle.dev"}' cargo build
+```
 
 Test audio arrives in real time, like a microphone, so transcribing ahead
 behaves as it would with real speech. With `VOCELLE_TEST_DICTATE`,

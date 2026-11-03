@@ -146,8 +146,8 @@ Type in **Try it** to preview any level. Vocelle also adds a space after each di
 
 | Model | Size | Languages | Best for |
 |---|---|---|---|
-| **Tiny (English)** | 78 MB | English | Fastest; recommended for 2- and 4-core laptops |
-| Base (English) | 148 MB | English | Fewer mistakes than Tiny; quick on 6+ core PCs |
+| Tiny (English) | 78 MB | English | Fastest, a little less accurate; best for slow or older PCs |
+| **Base (English)** | 148 MB | English | Accurate and quick on most laptops; the best place to start |
 | Base (multilingual) | 148 MB | 99 languages | Like Base, for other languages |
 | Small (English) | 190 MB | English | Higher accuracy on a recent 4+ core CPU |
 | Small (multilingual) | 190 MB | 99 languages | Like Small, for other languages |
@@ -162,6 +162,7 @@ Everything is set in the app, which saves automatically. The files live here:
 | What | Windows | Linux |
 |---|---|---|
 | Settings | `%APPDATA%\com.codewithdark.vocelle\settings.json` | `~/.config/com.codewithdark.vocelle/settings.json` |
+| Log (timings only) | `%LOCALAPPDATA%\com.codewithdark.vocelle\vocelle.log` | `~/.local/share/com.codewithdark.vocelle/vocelle.log` |
 | History and totals | `%LOCALAPPDATA%\com.codewithdark.vocelle\history.json`, `stats.json` | `~/.local/share/com.codewithdark.vocelle/history.json`, `stats.json` |
 | Models | `%LOCALAPPDATA%\com.codewithdark.vocelle\models\` | `~/.local/share/com.codewithdark.vocelle/models/` |
 
@@ -245,7 +246,10 @@ Add it to the **Dictionary** on the Text tab. If it still comes out wrong, add a
 <details>
 <summary><b>Transcription is slow</b></summary>
 
-Switch to *Tiny (English)*, the fastest model. Closing CPU-heavy apps also helps.
+- On a laptop, plug in the charger or choose **Best performance** in Windows *Settings → System → Power*. On battery, Windows can slow the processor to a third of its speed, and dictation slows down with it.
+- Switch to *Tiny (English)*, the fastest model. Home suggests this when recent dictations were slow.
+- Close CPU-heavy apps (video rendering, games, many browser tabs).
+- Each dictation's timings are written to `vocelle.log` (see [Configuration](#configuration)). The log never contains what you said.
 </details>
 
 <details>
