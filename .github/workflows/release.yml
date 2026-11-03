@@ -92,7 +92,13 @@ jobs:
       - name: Windows build settings
         if: runner.os == 'Windows'
         shell: bash
-        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
+        run: |
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
+          # The cmake crate replaces CMake's Release flags on MSVC and drops
+          # the optimization level, so whisper.cpp would be built without
+          # optimizations (about 7x slower). Defining them keeps -O2.
+          echo "CMAKE_C_FLAGS_RELEASE=-MD -O2 -Ob2 -DNDEBUG" >> "$GITHUB_ENV"
+          echo "CMAKE_CXX_FLAGS_RELEASE=-MD -O2 -Ob2 -DNDEBUG" >> "$GITHUB_ENV"
 
       - run: npm ci
 
@@ -102,3 +108,14 @@ jobs:
         with:
           releaseId: ${{ needs.draft.outputs.release_id }}
           args: --bundles ${{ matrix.bundles }}
+
+      - name: Check the speech engine was optimized
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cache=$(ls src-tauri/target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)
+          grep -E "^CMAKE_CXX_FLAGS_RELEASE:" "$cache"
+          if ! grep -qE "^CMAKE_CXX_FLAGS_RELEASE:STRING=.*-O2" "$cache"; then
+            echo "::error::whisper.cpp was built without -O2; don't publish this draft"
+            exit 1
+          fi

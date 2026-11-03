@@ -69,6 +69,13 @@ Every release ships installers for Windows (`.exe`) and Linux (`.deb`, `.AppImag
 
 ## Build notes
 
+- **Windows release builds must set `CMAKE_C_FLAGS_RELEASE` and
+  `CMAKE_CXX_FLAGS_RELEASE` to `-MD -O2 -Ob2 -DNDEBUG`.** On MSVC the cmake
+  crate replaces CMake's Release flags and drops the optimization level, so
+  without these whisper.cpp is built unoptimized and dictation is about 7x
+  slower (this shipped in 0.2.0–0.3.1). The release workflow sets them and
+  fails if the built CMake cache lacks `-O2`. Development builds aren't
+  affected.
 - whisper.cpp is compiled for an AVX2 baseline (see
   `src-tauri/.cargo/config.toml`), so installers behave the same no matter
   which machine builds them.
