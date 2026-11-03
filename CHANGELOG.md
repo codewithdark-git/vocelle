@@ -6,6 +6,20 @@ All notable changes to Vocelle are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-03
+
+The real fix for slow dictation in the installed app.
+
+### Fixed
+
+- **Dictation in the installed app was 5–7 times slower than it should be**
+  (since 0.2.0). The Windows installers were built with the speech engine
+  unoptimized: a build tool silently dropped the optimization setting. On a
+  2-core laptop, loading the Base model went from 10–15 s to 1–3 s, and
+  dictations finish correspondingly faster. 0.1.0 was built differently,
+  which is why it felt fast. The release build now checks for this and
+  refuses to continue without it.
+
 ## [0.3.1] - 2026-11-03
 
 Fixes slow and inaccurate dictation in 0.3.0 on real microphones and busy or
@@ -181,7 +195,8 @@ transcribed entirely on your PC.
   dictating are cleared.
 - The talk key can't be changed yet.
 
-[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/codewithdark-git/vocelle/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/codewithdark-git/vocelle/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/codewithdark-git/vocelle/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codewithdark-git/vocelle/compare/v0.1.0...v0.2.0
