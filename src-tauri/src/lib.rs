@@ -7,6 +7,7 @@ mod history;
 mod hotkey;
 mod insert;
 mod keys;
+mod log;
 mod models;
 mod overlay;
 mod settings;
@@ -39,6 +40,10 @@ pub fn run() {
         .manage(speech::Downloads::default())
         .manage(history::History::default())
         .setup(|app| {
+            if let Ok(dir) = app.path().app_local_data_dir() {
+                log::init(dir);
+            }
+            log::write(&format!("Vocelle {} starting", app.package_info().version));
             app.manage(settings::Store::load(app.handle()));
             // The Settings window is created only now, after the state its
             // commands use is registered (it has `"create": false` in the config).

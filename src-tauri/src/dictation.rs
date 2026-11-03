@@ -29,6 +29,7 @@ use crate::{
     history::History,
     hotkey::{self, HotkeyEvent},
     insert,
+    log::log,
     overlay::{self, Phase},
     settings::{Settings, Store},
 };
@@ -41,9 +42,11 @@ const MAX_RECORDING: Duration = Duration::from_secs(5 * 60);
 const LEVEL_INTERVAL: Duration = Duration::from_millis(50);
 /// How often to look for a finished phrase to transcribe ahead.
 const AHEAD_INTERVAL: Duration = Duration::from_millis(800);
-/// Untranscribed audio needed before transcribing ahead. Shorter dictations
-/// are fast enough to do in one go on release.
-const AHEAD_MIN_SECONDS: f32 = 3.0;
+/// Recording length before transcribing ahead starts. Shorter dictations are
+/// transcribed in one piece on release, which is the most accurate.
+const AHEAD_START_SECONDS: f32 = 8.0;
+/// Shortest part transcribed ahead. Longer parts give Whisper whole sentences.
+const AHEAD_MIN_SECONDS: f32 = 6.0;
 /// Audio at the end that's never transcribed ahead: the user may be mid-word.
 const AHEAD_TAIL_SECONDS: f32 = 0.6;
 const DONE_LINGER: Duration = Duration::from_millis(600);
@@ -78,6 +81,8 @@ struct Ahead {
     /// Samples already transcribed, from the start of the recording.
     done: usize,
     texts: Vec<String>,
+    /// Time spent transcribing ahead.
+    busy: Duration,
 }
 
 struct Active {
@@ -191,7 +196,9 @@ fn transcribe_ahead(app: &AppHandle, rec: &mut Active) {
     let done = rec.ahead.lock().unwrap().done;
     let samples = rec.rec.snapshot();
     let min = seconds_to_samples(AHEAD_MIN_SECONDS);
-    if samples.len().saturating_sub(done) < min {
+    if samples.len() < seconds_to_samples(AHEAD_START_SECONDS)
+        || samples.len().saturating_sub(done) < min
+    {
         return;
     }
 
@@ -208,8 +215,10 @@ fn transcribe_ahead(app: &AppHandle, rec: &mut Active) {
                 return;
             };
             let settings = app.state::<Store>().get();
+            let started = Instant::now();
             if let Ok(text) = engine.transcribe(&pending[..cut], &options(&settings)) {
                 let mut ahead = ahead.lock().unwrap();
+                ahead.busy += started.elapsed();
                 ahead.done = done + cut;
                 if !text.is_empty() {
                     ahead.texts.push(text);
@@ -246,18 +255,13 @@ struct Finisher {
 impl Finisher {
     fn run(self, rx: Receiver<Finished>) {
         for finished in rx {
-            let started = Instant::now();
             let outcome = self.finish(finished);
-            eprintln!(
-                "vocelle: finished in {} ms after release",
-                started.elapsed().as_millis()
-            );
             if !self.recording.load(Ordering::Relaxed) {
                 let (phase, message, linger) = match outcome {
                     Ok(true) => (Phase::Done, None, DONE_LINGER),
                     Ok(false) => (Phase::Empty, None, DONE_LINGER),
                     Err(message) => {
-                        eprintln!("vocelle: {message}");
+                        log!("{message}");
                         (Phase::Error, Some(message), ERROR_LINGER)
                     }
                 };
@@ -270,17 +274,20 @@ impl Finisher {
     /// Returns whether any text was inserted.
     fn finish(&self, finished: Finished) -> Result<bool, String> {
         let app = &self.app;
+        let released = Instant::now();
         if let Some(job) = finished.job {
             let _ = job.join();
         }
+        let waited = released.elapsed();
         let settings = app.state::<Store>().get();
         let engine = app.state::<Engine>();
-        let (done, mut parts) = {
+        let (done, mut parts, busy_ahead) = {
             let ahead = finished.ahead.lock().unwrap();
-            (ahead.done, ahead.texts.clone())
+            (ahead.done, ahead.texts.clone(), ahead.busy)
         };
 
         let rest = finished.samples.get(done..).unwrap_or_default();
+        let rest_started = Instant::now();
         let rest_text = engine
             .transcribe(rest, &options(&settings))
             .inspect_err(|_| {
@@ -288,25 +295,42 @@ impl Finisher {
                     crate::show_main_window(app);
                 }
             })?;
+        let rest_time = rest_started.elapsed();
         if !rest_text.is_empty() {
             parts.push(rest_text);
         }
 
+        let seconds = finished.samples.len() as f32 / TARGET_RATE as f32;
+        let peak = finished.samples.iter().fold(0.0_f32, |m, s| m.max(s.abs()));
+        // Transcription time per second of audio; above about 0.3 it feels slow.
+        let busy = busy_ahead + rest_time;
+        let speed = busy.as_secs_f32() / seconds.max(0.1);
         let raw = join_parts(&parts);
         let text = cleanup::clean(&raw, settings.cleanup, &settings.replacements);
         if text.is_empty() {
             return Ok(false);
         }
         let text_to_insert = with_trailing_space(&text, &settings);
+        let insert_started = Instant::now();
         if test_env("VOCELLE_TEST_NO_INSERT").is_some() {
             eprintln!("vocelle: would insert {text_to_insert:?}");
         } else {
             insert::insert_text(&text_to_insert).map_err(|e| e.to_string())?;
         }
+        log!(
+            "dictation: {seconds:.1} s audio, peak {peak:.2}, {} parts, model {}; \
+             waited {} ms for the part in progress, last part {} ms, insert {} ms, \
+             ready {} ms after release, {speed:.2} s per audio second",
+            parts.len(),
+            engine.loaded_model().unwrap_or("none"),
+            waited.as_millis(),
+            rest_time.as_millis(),
+            insert_started.elapsed().as_millis(),
+            released.elapsed().as_millis()
+        );
 
         let history = app.state::<History>();
-        let seconds = finished.samples.len() as f32 / TARGET_RATE as f32;
-        history.count(app, &text, seconds);
+        history.count(app, &text, seconds, speed);
         if settings.history {
             let model = engine.loaded_model().unwrap_or_default();
             history.add(app, &text, seconds, model);
@@ -378,7 +402,7 @@ fn with_trailing_space(text: &str, settings: &Settings) -> String {
 }
 
 fn show_error(app: &AppHandle, message: String) -> Instant {
-    eprintln!("vocelle: {message}");
+    log!("{message}");
     overlay::set_status(app, Phase::Error, Some(message));
     overlay::show(app);
     Instant::now() + ERROR_LINGER

@@ -12,7 +12,7 @@ use whisper_rs::{
     WhisperVadContext, WhisperVadContextParams, WhisperVadParams,
 };
 
-use crate::{audio::TARGET_RATE, models::ModelInfo};
+use crate::{audio::TARGET_RATE, log::log, models::ModelInfo};
 
 /// whisper.cpp warns on clips under one second, so short clips are padded with silence.
 const MIN_SAMPLES: usize = TARGET_RATE as usize * 11 / 10;
@@ -29,9 +29,13 @@ const AUDIO_CTX_MARGIN_SECONDS: f32 = 1.0;
 const MIN_AUDIO_CTX: usize = 384;
 /// Audio kept around the detected speech, so first and last syllables aren't cut.
 const SPEECH_PAD_SECONDS: f32 = 0.25;
-/// Length of the warm-up clip. Whisper sizes its buffers for the longest clip
-/// so far, so warming up with a typical dictation length keeps later ones fast.
-const WARM_UP_SECONDS: usize = 10;
+/// Length of the warm-up clip. Long enough to allocate Whisper's buffers and
+/// warm the caches, short enough to stay cheap on a slow or throttled laptop.
+const WARM_UP_SECONDS: usize = 3;
+/// Silence needed to split a long dictation into parts. Shorter gaps happen
+/// inside phrases, and cutting there breaks words ("buy groceries" became
+/// "Microceries" in testing).
+const MIN_PAUSE_MS: i32 = 500;
 
 /// Per-dictation choices from Settings.
 #[derive(Debug, Default)]
@@ -87,7 +91,7 @@ impl Engine {
             params.set_n_threads(1);
             params.set_use_gpu(false);
             WhisperVadContext::new(&path.to_string_lossy(), params)
-                .inspect_err(|e| eprintln!("vocelle: voice detection unavailable: {e}"))
+                .inspect_err(|e| log!("voice detection unavailable: {e}"))
                 .ok()
         });
         let mut loaded = Loaded { model, state, vad };
@@ -95,10 +99,11 @@ impl Engine {
         // instead of during the user's first dictation.
         let silence = vec![0.0; TARGET_RATE as usize * WARM_UP_SECONDS];
         let _ = run_whisper(&mut loaded, &silence, &Options::default());
-        eprintln!(
-            "vocelle: loaded {} in {} ms",
+        log!(
+            "loaded {} in {} ms ({} threads)",
             model.id,
-            started.elapsed().as_millis()
+            started.elapsed().as_millis(),
+            threads()
         );
         *self.loaded.lock().unwrap() = Some(loaded);
         Ok(())
@@ -125,8 +130,8 @@ impl Engine {
             None => samples,
         };
         let text = run_whisper(loaded, speech, options)?;
-        eprintln!(
-            "vocelle: transcribed {:.1} s ({:.1} s of speech) in {} ms with {}",
+        log!(
+            "transcribed {:.1} s ({:.1} s of speech) in {} ms with {}",
             samples.len() as f32 / TARGET_RATE as f32,
             speech.len() as f32 / TARGET_RATE as f32,
             started.elapsed().as_millis(),
@@ -143,8 +148,10 @@ impl Engine {
     pub fn pause_point(&self, samples: &[f32], min: usize, tail: usize) -> Option<usize> {
         let mut guard = self.loaded.lock().unwrap();
         let vad = guard.as_mut()?.vad.as_mut()?;
+        let mut params = WhisperVadParams::default();
+        params.set_min_silence_duration(MIN_PAUSE_MS);
         let segments: Vec<(usize, usize)> = vad
-            .segments_from_samples(WhisperVadParams::default(), samples)
+            .segments_from_samples(params, samples)
             .ok()?
             .map(|s| (centis_to_index(s.start), centis_to_index(s.end)))
             .collect();
@@ -176,7 +183,7 @@ fn speech_span(vad: &mut WhisperVadContext, samples: &[f32]) -> Option<(usize, u
             Ok(segments) => segments.map(|s| (s.start, s.end)).collect(),
             Err(err) => {
                 // Transcribe everything rather than drop the dictation.
-                eprintln!("vocelle: voice detection failed: {err}");
+                log!("voice detection failed: {err}");
                 return Some((0, samples.len()));
             }
         };
@@ -208,9 +215,12 @@ fn run_whisper(loaded: &mut Loaded, speech: &[f32], options: &Options) -> Result
         params.set_initial_prompt(prompt);
     }
     params.set_audio_ctx(audio_ctx(audio.len()));
-    // Whisper can get stuck repeating a phrase. Its built-in retry catches most
-    // of these (and costs nothing when the first pass is fine); this cap stops
-    // the rest. Fast speech is under 6 tokens a second.
+    // No retries at higher temperatures: on unclear audio (accents, a quiet
+    // mic) Whisper would decode up to five more times, which took over 100 s
+    // on a throttled laptop in testing. Repeated phrases are handled by the
+    // encoder floor, this token cap (fast speech is under 6 tokens a second)
+    // and drop_repeats().
+    params.set_temperature_inc(0.0);
     params.set_max_tokens(max_tokens(speech.len()));
     params.set_no_context(true);
     params.set_no_timestamps(true);

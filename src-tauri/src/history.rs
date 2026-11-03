@@ -29,14 +29,20 @@ pub struct Entry {
 }
 
 /// Totals across all dictations, for the Home page.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Stats {
     pub dictations: u64,
     pub words: u64,
     /// Total length of the recordings.
     pub seconds: f64,
+    /// Transcription time per second of audio for the last few dictations,
+    /// newest last. Home suggests a faster model when these are high.
+    pub recent_speed: Vec<f32>,
 }
+
+/// How many recent dictations `recent_speed` keeps.
+const RECENT: usize = 5;
 
 /// Serializes file access between the dictation thread and Settings commands.
 #[derive(Default)]
@@ -74,14 +80,18 @@ impl History {
         read_json(&data_file(app, "stats.json")).unwrap_or_default()
     }
 
-    /// Adds one dictation to the totals.
-    pub fn count(&self, app: &AppHandle, text: &str, seconds: f32) {
+    /// Adds one dictation to the totals. `speed` is transcription time per
+    /// second of audio.
+    pub fn count(&self, app: &AppHandle, text: &str, seconds: f32, speed: f32) {
         let _lock = self.0.lock().unwrap();
         let path = data_file(app, "stats.json");
         let mut stats: Stats = read_json(&path).unwrap_or_default();
         stats.dictations += 1;
         stats.words += text.split_whitespace().count() as u64;
         stats.seconds += f64::from(seconds);
+        stats.recent_speed.push(speed);
+        let excess = stats.recent_speed.len().saturating_sub(RECENT);
+        stats.recent_speed.drain(..excess);
         write_json(&path, &stats);
     }
 
