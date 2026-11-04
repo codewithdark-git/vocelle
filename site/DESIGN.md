@@ -3,13 +3,15 @@
 Read this before changing the site. It exists so the site keeps a point of
 view instead of drifting back to a template.
 
-## The idea: the held key
+## The idea: the product, working
 
-Vocelle is one gesture: hold a key, talk, let go. The site is built around
-that object. The hero is a physical keycap you can press (or press your real
-Right Ctrl). While it's held the page *listens*: the headline's letters
-stretch with the voice (Anybody's width axis) and the field warms. That is
-the one bold moment. Everything after it is calm, specific and factual.
+Vocelle is one gesture: hold a key, talk, let go. The hero shows exactly
+that, live: a small desktop with an app window, a taskbar and Vocelle's real
+indicator pill. A loop plays four everyday dictations (an email, a chat, a
+code comment, a note): the live caption shows what was heard, fillers
+included, and the clean text lands in the app. Holding Right Ctrl, or the
+key on stage, lets the visitor drive it. Everything after the hero shows
+the real app, real measurements and plain facts.
 
 ## Colour
 
@@ -44,9 +46,12 @@ uniform section padding.
 
 ## Motion
 
-- One orchestrated page load (keycap settles, headline widens).
+- One orchestrated page load (the headline widens) and the demo loop.
 - Pressing the key: immediate (≤120 ms) and physical.
-- Two pinned, scroll-scrubbed scenes (the caret through apps, the air-gap).
+- Pinned, scroll-scrubbed scenes: the product tour (a camera moving over the
+  real screens), the caret through apps, the air-gap.
+- Section headings rise a line at a time from a mask; sections slide over
+  each other like stacked sheets. No other entrance effects.
 - Only `transform`, `opacity` and font variations. Ease: `cubic-bezier(0.23, 1, 0.32, 1)`.
 - `prefers-reduced-motion`: show every scene's end state; no smooth scrolling.
 

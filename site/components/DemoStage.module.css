@@ -1,0 +1,404 @@
+/* A small desktop. Proportions follow a 16:10 laptop screen. */
+.stage {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #3a1a0b;
+  box-shadow:
+    0 0 0 1px rgb(42 18 6 / 0.35),
+    0 50px 100px -40px rgb(42 18 6 / 0.75),
+    0 20px 40px -20px rgb(42 18 6 / 0.45);
+  isolation: isolate;
+}
+
+/* Wallpaper: warm, soft shapes so the windows have something to sit on. */
+.wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60% 70% at 15% 20%, #ffb88a 0%, transparent 60%),
+    radial-gradient(50% 60% at 85% 30%, #ff7a45 0%, transparent 65%),
+    radial-gradient(70% 70% at 60% 100%, #b8380a 0%, transparent 70%),
+    #ffd2b4;
+  transition: filter 600ms var(--ease);
+}
+
+.stage[data-app="code"] .wallpaper {
+  filter: hue-rotate(-8deg) saturate(0.85) brightness(0.92);
+}
+
+.window {
+  position: absolute;
+  inset: 8% 12% 33%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(42 18 6 / 0.12),
+    0 30px 60px -24px rgb(42 18 6 / 0.55);
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgb(42 18 6 / 0.08);
+  font: 600 13px/1 var(--sans);
+  color: #6b4a38;
+}
+
+.lights {
+  width: 40px;
+  height: 10px;
+  background:
+    radial-gradient(circle at 5px 5px, #ff8a65 4px, transparent 4.5px),
+    radial-gradient(circle at 20px 5px, #ffc46b 4px, transparent 4.5px),
+    radial-gradient(circle at 35px 5px, #b7d98b 4px, transparent 4.5px);
+}
+
+.app {
+  font-weight: 800;
+  color: var(--umber);
+}
+
+.title {
+  margin-left: auto;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.body {
+  flex: 1;
+  padding: clamp(14px, 2.2vw, 26px) clamp(16px, 2.6vw, 30px);
+}
+
+.context {
+  margin-bottom: 14px;
+  color: #8a6a58;
+  font: 500 clamp(12px, 1.05vw, 15px) / 1.3 var(--sans);
+}
+
+.field {
+  font-size: clamp(16px, 1.75vw, 24px);
+  line-height: 1.45;
+  color: var(--umber);
+}
+
+.placeholder {
+  color: #b39a8b;
+  font-style: italic;
+}
+
+/* The pasted text gets a brief ember wash that slides away. */
+.typed {
+  background-image: linear-gradient(rgb(255 90 31 / 0.22), rgb(255 90 31 / 0.22));
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--ember);
+  animation: blink 1.05s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* App materials */
+.chat .body {
+  background: #fbf7f3;
+}
+
+.chat .context {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgb(42 18 6 / 0.08);
+}
+
+.code {
+  background: #1c0b03;
+}
+
+.code .titlebar {
+  border-color: rgb(255 230 212 / 0.1);
+  color: rgb(255 230 212 / 0.6);
+}
+
+.code .app {
+  color: var(--apricot);
+}
+
+.code .context {
+  color: #e9b48e;
+  font-family: var(--sans);
+  font-stretch: 75%;
+}
+
+.code .field {
+  padding-left: 18px;
+  color: #c79b7b;
+  font-family: var(--sans);
+  font-size: clamp(14px, 1.45vw, 20px);
+  font-stretch: 75%;
+}
+
+.notes .body {
+  background: repeating-linear-gradient(transparent 0 30px, rgb(184 56 10 / 0.12) 30px 31px), #fffaf3;
+}
+
+/* The taskbar and the indicator above it. */
+.taskbar {
+  position: absolute;
+  left: 50%;
+  bottom: 3.5%;
+  display: flex;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgb(42 18 6 / 0.55);
+  backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+}
+
+.taskbar span {
+  width: clamp(18px, 2vw, 26px);
+  height: clamp(18px, 2vw, 26px);
+  border-radius: 7px;
+  background: rgb(255 230 212 / 0.28);
+}
+
+.taskbar span:first-child {
+  background: var(--ember);
+}
+
+.pill {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 38px;
+  border-radius: 19px;
+  background: rgb(42 18 6 / 0.96);
+  box-shadow: 0 10px 24px rgb(42 18 6 / 0.4);
+  opacity: 0;
+  transform: translate(-50%, 10px) scale(0.92);
+  transition:
+    opacity 220ms var(--ease),
+    transform 320ms var(--ease),
+    width 260ms var(--ease);
+}
+
+.pill > * {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 160ms var(--ease);
+}
+
+.pill[data-phase="listening"],
+.pill[data-phase="thinking"],
+.pill[data-phase="done"] {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.pill[data-phase="listening"] .bars,
+.pill[data-phase="thinking"] .dots,
+.pill[data-phase="done"] .check {
+  opacity: 1;
+}
+
+.pill[data-phase="thinking"] {
+  width: 76px;
+}
+
+.pill[data-phase="done"] {
+  width: 58px;
+}
+
+.bars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+}
+
+.bars i {
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: linear-gradient(var(--apricot), var(--ember));
+  animation: talk 0.8s ease-in-out infinite;
+}
+
+@keyframes talk {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ember);
+  animation: wave 0.9s ease-in-out infinite;
+}
+
+.dots i:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.dots i:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes wave {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+.check {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #4ade80;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* What the microphone hears, live. */
+.caption {
+  position: absolute;
+  left: 50%;
+  bottom: 23%;
+  max-width: 70%;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgb(42 18 6 / 0.82);
+  color: rgb(255 230 212 / 0.92);
+  font-family: var(--sans);
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-stretch: 80%;
+  line-height: 1.35;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 200ms var(--ease),
+    transform 200ms var(--ease);
+}
+
+.caption[data-show="true"] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.caption:empty {
+  opacity: 0;
+}
+
+.filler {
+  color: var(--ember);
+  text-decoration: line-through;
+}
+
+/* The key you can hold. */
+.key {
+  position: absolute;
+  left: 3%;
+  bottom: 3.5%;
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px 9px;
+  border: 0;
+  border-radius: 11px;
+  background: #2a1206;
+  box-shadow: 0 6px 0 #120601;
+  color: var(--apricot);
+  font: 800 clamp(13px, 1.2vw, 16px) / 1 var(--sans);
+  font-stretch: 110%;
+  text-align: left;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  transition:
+    transform 90ms var(--ease),
+    box-shadow 90ms var(--ease);
+}
+
+.key[data-down="true"] {
+  box-shadow: 0 1px 0 #120601;
+  transform: translateY(5px);
+}
+
+.keyHint {
+  font: 500 11px/1 var(--sans);
+  opacity: 0.7;
+}
+
+.key:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .stage {
+    aspect-ratio: 4 / 5;
+    border-radius: 18px;
+  }
+
+  .window {
+    inset: 7% 5% 30%;
+  }
+
+  .caption {
+    bottom: 27%;
+    max-width: 88%;
+  }
+
+  .pill {
+    bottom: 17%;
+  }
+
+  /* Keep the key and the taskbar apart on narrow screens. */
+  .taskbar {
+    left: auto;
+    right: 4%;
+    transform: none;
+  }
+}
