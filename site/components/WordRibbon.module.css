@@ -2,7 +2,7 @@
   position: relative;
   height: clamp(130px, 15vw, 230px);
   overflow: hidden;
-  background: linear-gradient(var(--ember) 0 46%, var(--peach) 46%);
+  background: var(--ember);
 }
 
 .svg {

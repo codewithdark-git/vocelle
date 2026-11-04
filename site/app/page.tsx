@@ -1,27 +1,36 @@
 import { AirGap } from "@/components/AirGap";
 import { Anywhere } from "@/components/Anywhere";
 import { Closing } from "@/components/Closing";
+import { Grain, HeadingReveal, StickyBar } from "@/components/Craft";
 import { Download } from "@/components/Download";
+import { Cost, Limits } from "@/components/Facts";
 import { Hero } from "@/components/Hero";
-import { Product } from "@/components/Product";
 import { Race } from "@/components/Race";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Specs } from "@/components/Specs";
+import { Tour } from "@/components/Tour";
 import { WordRibbon } from "@/components/WordRibbon";
 
 export default function Home() {
   return (
-    <main>
+    <>
       <SmoothScroll />
-      <Hero />
-      <WordRibbon />
-      <Anywhere />
-      <Product />
-      <Race />
-      <AirGap />
-      <Specs />
-      <Download />
-      <Closing />
-    </main>
+      <HeadingReveal />
+      <StickyBar />
+      <Grain />
+      <main>
+        <Hero />
+        <WordRibbon />
+        <Tour />
+        <Anywhere />
+        <AirGap />
+        <Cost />
+        <Race />
+        <Specs />
+        <Limits />
+        <Download />
+        <Closing />
+      </main>
+    </>
   );
 }

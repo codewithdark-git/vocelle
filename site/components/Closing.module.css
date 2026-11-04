@@ -1,6 +1,6 @@
 .faq {
   padding: clamp(96px, 11vw, 160px) 0;
-  background: var(--paper);
+  background: var(--peach);
 }
 
 .grid {
