@@ -1,0 +1,4 @@
+GSAP 3.13.0 (gsap, ScrollTrigger, SplitText, Flip, MotionPathPlugin, DrawSVGPlugin)
+by GreenSock, free to use, including commercially, under the GSAP Standard
+"No Charge" License: https://gsap.com/standard-license
+Source: https://www.npmjs.com/package/gsap
