@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vocelle: hold a key, talk, and it's typed</title>
+  <meta name="description" content="Vocelle types what you say into any app on Windows and Linux. Speech recognition runs on your own computer, so your voice never leaves it. Free, no account.">
+  <meta name="theme-color" content="#FF5A1F">
+  <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml">
+  <meta property="og:title" content="Vocelle: hold a key, talk, and it's typed">
+  <meta property="og:description" content="Private voice typing for Windows and Linux. Runs on your computer; your voice never leaves it.">
+  <meta property="og:image" content="https://codewithdark-git.github.io/vocelle/assets/og.jpg">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="preload" href="fonts/anybody-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="bar" id="bar">
+    <a class="brand" href="#top" aria-label="Vocelle home">
+      <img src="assets/logo-mark.svg" alt="" width="28" height="28">
+      <span>Vocelle</span>
+    </a>
+    <nav class="bar-links" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#private">Privacy</a>
+      <a href="#app">The app</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="button button-ink button-small js-download" href="https://github.com/codewithdark-git/vocelle/releases/latest">Download</a>
+  </header>
+
+  <main id="main">
+    <!-- Hero: the gesture, live. The scene warms up while it listens. -->
+    <section class="hero" id="top">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="hero-copy">
+        <h1 class="hero-title" aria-label="Hold a key. Talk. It's typed.">
+          <span class="line">Hold a key. Talk.</span>
+          <span class="line">It's typed.</span>
+        </h1>
+        <p class="hero-lead">Private voice typing for Windows and Linux. Vocelle listens and writes on your own computer, in any app, and your voice never leaves it.</p>
+        <div class="hero-actions">
+          <a class="button button-ember js-download" href="https://github.com/codewithdark-git/vocelle/releases/latest">Download for Windows</a>
+          <a class="button button-ghost" href="#download">Linux and other downloads</a>
+        </div>
+        <p class="hero-meta"><span class="js-version">Version 0.3.2</span>, free, no account.</p>
+      </div>
+
+      <div class="stage" id="stage" aria-label="Try it: hold Right Ctrl, or press and hold the key below the screen">
+        <div class="screen">
+          <div class="desktop">
+            <div class="window">
+              <div class="window-bar" aria-hidden="true"><span></span><span></span><span></span><b class="js-app-name">Mail</b></div>
+              <div class="window-body">
+                <div class="field-label" aria-hidden="true">To: Sarah · Subject: Onboarding review</div>
+                <p class="doc" aria-live="polite"><span class="js-typed"></span><span class="caret" aria-hidden="true"></span></p>
+              </div>
+            </div>
+            <div class="heard" aria-hidden="true"><span class="js-heard"></span></div>
+            <div class="pill" data-phase="idle" aria-hidden="true">
+              <div class="pill-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="pill-dots"><i></i><i></i><i></i></div>
+              <svg class="pill-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+            </div>
+            <div class="desk-taskbar" aria-hidden="true"><img src="assets/logo-mark.svg" alt="" width="16" height="16"></div>
+          </div>
+        </div>
+        <div class="keyrow">
+          <button class="key" type="button" id="key" aria-describedby="key-hint">Right Ctrl</button>
+          <p class="key-hint" id="key-hint">Press and hold to try it, or hold <kbd>Right Ctrl</kbd> on your keyboard.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pinned story: hold, talk, release. -->
+    <section class="story" id="how" aria-label="How it works">
+      <div class="story-sticky">
+        <div class="story-steps">
+          <article class="story-step" data-step="0">
+            <h2>Hold your talk key.</h2>
+            <p>Right Ctrl by default, or any key you like. A small pill appears above the taskbar. It never steals focus from what you're writing.</p>
+          </article>
+          <article class="story-step" data-step="1">
+            <h2>Talk the way you talk.</h2>
+            <p>Ums, false starts and doubled words included. The bars follow your voice; nothing is sent anywhere while you speak.</p>
+          </article>
+          <article class="story-step" data-step="2">
+            <h2>Let go. It's typed.</h2>
+            <p>Fillers and stutters are cleaned up and the text lands at your cursor, in about the time it takes to look back at the screen.</p>
+          </article>
+        </div>
+
+        <div class="story-stage" aria-hidden="true">
+          <div class="story-screen">
+            <div class="story-doc">
+              <p class="story-text"><span class="story-done">Thanks for the update. </span><span class="story-new">I'll review the draft this afternoon and send comments by Friday.</span><span class="caret"></span></p>
+            </div>
+            <p class="story-heard">um, so I'll review the the draft this afternoon, uh, and send comments by Friday</p>
+            <div class="pill story-pill" data-phase="idle">
+              <div class="pill-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="pill-dots"><i></i><i></i><i></i></div>
+              <svg class="pill-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+            </div>
+            <div class="taskbar"><span class="story-key">Right Ctrl</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Anywhere you type. -->
+    <section class="anywhere">
+      <h2 class="section-title">Anywhere you can type.</h2>
+      <p class="section-lead">If an app has a text cursor and accepts paste, Vocelle can write into it. Your clipboard is put back afterwards, images and formatting included.</p>
+      <div class="apps">
+        <div class="app-tabs" role="tablist" aria-label="Example apps">
+          <button role="tab" aria-selected="true" data-app="0">Email</button>
+          <button role="tab" aria-selected="false" data-app="1">Chat</button>
+          <button role="tab" aria-selected="false" data-app="2">Document</button>
+          <button role="tab" aria-selected="false" data-app="3">Code</button>
+        </div>
+        <div class="app-window" role="tabpanel" aria-live="polite">
+          <div class="app-chrome" aria-hidden="true"><span></span><span></span><span></span><b class="js-chrome">Mail</b></div>
+          <div class="app-body js-app-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy. -->
+    <section class="private" id="private">
+      <div class="private-inner">
+        <h2 class="private-title">Your voice never leaves your computer.</h2>
+        <p class="private-lead">Other dictation apps send your recordings to their servers and ask you to trust their certificates. Vocelle doesn't need a connection at all: it works the same in airplane mode.</p>
+        <div class="airgap" aria-hidden="true">
+          <div class="airgap-node">Your voice</div>
+          <div class="airgap-line"><i></i></div>
+          <div class="airgap-node airgap-pc">This computer</div>
+          <div class="airgap-cut"><span class="airgap-cloud">The cloud</span></div>
+        </div>
+        <dl class="facts">
+          <div><dt>No account</dt><dd>Install it and talk. There's nothing to sign up for.</dd></div>
+          <div><dt>Works offline</dt><dd>The only download is the speech model, once, from the official open-source repository.</dd></div>
+          <div><dt>Audio is never saved</dt><dd>Recordings live in memory while you speak, then they're gone. History keeps text only, and you can turn it off.</dd></div>
+          <div><dt>No tracking</dt><dd>No analytics, no telemetry. On Windows, dictated text stays out of clipboard history too.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Cleanup. -->
+    <section class="cleanup">
+      <div class="cleanup-copy">
+        <h2 class="section-title">Reads like you typed it.</h2>
+        <p class="section-lead">Choose how much tidying you want. Add names to your dictionary so they come out right every time.</p>
+        <div class="segmented" role="radiogroup" aria-label="Cleanup level">
+          <label><input type="radio" name="level" value="off"><span>Off</span></label>
+          <label><input type="radio" name="level" value="light"><span>Light</span></label>
+          <label><input type="radio" name="level" value="full" checked><span>Full</span></label>
+        </div>
+      </div>
+      <div class="compare">
+        <p class="compare-said"><span class="compare-label">You say</span>um so i think the the plan works, uh, for friday. i'll send it to dr okafor</p>
+        <p class="compare-typed"><span class="compare-label">Vocelle types</span><span class="js-cleaned"></span></p>
+      </div>
+    </section>
+
+    <!-- The real app. -->
+    <section class="app-showcase" id="app">
+      <h2 class="section-title">A quiet app that stays out of the way.</h2>
+      <p class="section-lead">It lives in your tray. Open it to see your words dictated, tune the cleanup, or switch speech models.</p>
+      <div class="shots-tabs" role="tablist" aria-label="App screens">
+        <button role="tab" aria-selected="true" data-shot="home">Home</button>
+        <button role="tab" aria-selected="false" data-shot="welcome">Setup</button>
+        <button role="tab" aria-selected="false" data-shot="text">Text</button>
+        <button role="tab" aria-selected="false" data-shot="models">Models</button>
+      </div>
+      <figure class="shot">
+        <img class="js-shot" src="assets/product/home.png" width="1520" height="1280" alt="Vocelle's Home page: words dictated, time saved and recent dictations grouped by day" loading="lazy">
+      </figure>
+    </section>
+
+    <!-- Numbers. -->
+    <section class="numbers" aria-label="Measured numbers">
+      <div class="number"><b>0.7 s</b><span>to transcribe three seconds of speech on a 2017 two-core laptop</span></div>
+      <div class="number"><b>6</b><span>speech models, from 78 MB to 574 MB, checked before use</span></div>
+      <div class="number"><b>21</b><span>languages, or automatic detection</span></div>
+      <div class="number"><b>0</b><span>bytes of your audio sent anywhere, ever</span></div>
+    </section>
+
+    <!-- FAQ. -->
+    <section class="faq" id="faq">
+      <h2 class="section-title">Questions</h2>
+      <details>
+        <summary>Is it really free?</summary>
+        <p>Yes. Dictation, cleanup, the dictionary and history are free, with no word limits and no account.</p>
+      </details>
+      <details>
+        <summary>Does it need the internet?</summary>
+        <p>Only once, to download a speech model when you set it up. After that, Vocelle works completely offline.</p>
+      </details>
+      <details>
+        <summary>Which apps does it work with?</summary>
+        <p>Anything with a text cursor that accepts paste: email, chat, documents, browsers and code editors. On Linux, terminals that paste with Ctrl+Shift+V aren't supported yet.</p>
+      </details>
+      <details>
+        <summary>What do I need to run it?</summary>
+        <p>Windows 10 or 11 (64-bit), or a Linux desktop with an X11 session, a processor with AVX2 (Intel 2013 or later, AMD 2015 or later) and a microphone. Four gigabytes of memory is enough for the recommended model.</p>
+      </details>
+      <details>
+        <summary>Why does Windows warn me when I install it?</summary>
+        <p>The installer isn't code-signed yet, so Windows SmartScreen asks first. Click <em>More info</em>, then <em>Run anyway</em>. Signing is planned.</p>
+      </details>
+    </section>
+
+    <!-- Download. -->
+    <section class="download" id="download">
+      <h2 class="download-title">Talk to your computer today.</h2>
+      <div class="download-options">
+        <a class="dl dl-main js-download" href="https://github.com/codewithdark-git/vocelle/releases/latest">
+          <b>Windows</b>
+          <span>10 and 11, 64-bit · <span class="js-size">2.1 MB</span></span>
+        </a>
+        <a class="dl js-deb" href="https://github.com/codewithdark-git/vocelle/releases/latest">
+          <b>Debian and Ubuntu</b>
+          <span>.deb package, X11 session</span>
+        </a>
+        <a class="dl js-appimage" href="https://github.com/codewithdark-git/vocelle/releases/latest">
+          <b>Other Linux</b>
+          <span>AppImage, X11 session</span>
+        </a>
+      </div>
+      <p class="download-note"><span class="js-version">Version 0.3.2</span>. <a href="https://github.com/codewithdark-git/vocelle/blob/main/CHANGELOG.md">What's new</a> · <a href="https://github.com/codewithdark-git/vocelle#readme">Guide</a></p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span class="brand brand-small"><img src="assets/logo-mark.svg" alt="" width="22" height="22"> Vocelle</span>
+    <span>Private voice typing for Windows and Linux.</span>
+    <a href="https://github.com/codewithdark-git/vocelle">Source on GitHub</a>
+  </footer>
+</body>
+</html>
