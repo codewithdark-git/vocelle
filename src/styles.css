@@ -199,11 +199,298 @@ svg {
   box-shadow: var(--shadow);
 }
 
+/* ---------- Support (sidebar card + dialog) ---------- */
+
+.support {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+  margin-bottom: calc(var(--space-5) * -1 + var(--space-2));
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--ember) 30%, var(--border));
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--ember) 16%, transparent), transparent 70%),
+    var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+  white-space: normal;
+  transition:
+    transform 160ms ease-out,
+    border-color 160ms,
+    box-shadow 160ms;
+}
+
+.support:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--ember);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ember) 22%, transparent);
+}
+
+.support:focus-visible,
+.support-dialog button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.support-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.support-heart {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ember);
+  color: var(--umber);
+  flex: none;
+}
+
+.support-heart svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.support:hover .support-heart svg {
+  animation: beat 900ms ease-out;
+}
+
+.support-title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-stretch: 100%;
+  font-size: 0.98rem;
+  white-space: nowrap;
+}
+
+.support-chevron {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 160ms ease-out;
+}
+
+.support:hover .support-chevron {
+  transform: translateX(2px);
+  color: var(--accent-text);
+}
+
+.support-sub {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* Three overlapping embers: a small crowd, without inventing faces. */
+.support-dots {
+  display: inline-flex;
+  flex: none;
+}
+
+.support-dots i {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--apricot);
+}
+
+.support-dots i + i {
+  margin-left: -4px;
+}
+
+.support-dots i:nth-child(2) {
+  background: #ff8a55;
+}
+
+.support-dots i:nth-child(3) {
+  background: var(--ember);
+}
+
+@keyframes beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.25);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+}
+
+.support-dialog {
+  position: fixed;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    radial-gradient(90% 60% at 50% -10%, color-mix(in srgb, var(--ember) 18%, transparent), transparent 70%),
+    var(--surface);
+  color: var(--fg);
+  box-shadow: 0 24px 60px rgba(42, 18, 6, 0.25);
+  overflow: auto;
+}
+
+.support-dialog::backdrop {
+  background: color-mix(in srgb, var(--umber) 45%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.support-dialog[open] {
+  animation: pop-in 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.support-dialog[open]::backdrop {
+  animation: fade-in 200ms ease-out;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+.support-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.support-close:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.support-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-family: var(--display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-stretch: 112%;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.support-eyebrow .support-dots i {
+  border-color: var(--accent-soft);
+}
+
+.support-dialog h1 {
+  font-size: 1.5rem;
+  padding-right: var(--space-5);
+}
+
+.support-lead {
+  margin-top: var(--space-3);
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.support-funds {
+  display: grid;
+  gap: 6px;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.support-funds li {
+  position: relative;
+  padding: var(--space-2) var(--space-3) var(--space-2) 28px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.support-funds li::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 15px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ember);
+}
+
+.support-funds b {
+  margin-right: 4px;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.support-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.support-actions .primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-stretch: 108%;
+}
+
+.support-actions .primary svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
+}
+
+.support-note {
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support,
+  .support-chevron,
+  .support:hover .support-heart svg,
+  .support-dialog[open],
+  .support-dialog[open]::backdrop {
+    animation: none;
+    transition: none;
+  }
+}
+
 .engine {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: auto;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--surface);

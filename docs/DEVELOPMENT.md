@@ -132,7 +132,6 @@ src-tauri/src/
   commands.rs, speech.rs  Commands for the main window
   overlay.rs, tray.rs   Floating indicator and tray icon
 assets/                 Logo files and README screenshots
-site/                   Website (static HTML, deployed to GitHub Pages)
 scripts/                Version and release-notes helpers
 docs/                   Developer and release documentation
 ```

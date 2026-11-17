@@ -36,6 +36,20 @@
           </button>
         </nav>
 
+        <button type="button" class="support" id="support-open" aria-haspopup="dialog" aria-controls="support-dialog">
+          <span class="support-row">
+            <span class="support-heart" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-9.6A4 4 0 0 1 12 8a4 4 0 0 1 7 2.4C19 15.7 12 20 12 20z" /></svg>
+            </span>
+            <span class="support-title">Support us</span>
+            <svg class="support-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </span>
+          <span class="support-row support-sub">
+            <span class="support-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            Join the supporters
+          </span>
+        </button>
+
         <div class="engine" id="engine" data-state="loading">
           <span class="engine-dot" aria-hidden="true"></span>
           <span id="engine-status">Checking…</span>
@@ -281,6 +295,31 @@
         </footer>
       </div>
     </div>
+
+    <!-- Support: opens the XCollab support page in the browser, where people contribute. -->
+    <dialog class="support-dialog" id="support-dialog" aria-labelledby="support-dialog-title" aria-describedby="support-dialog-body">
+      <button type="button" class="support-close subtle" id="support-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+      <p class="support-eyebrow"><span class="support-dots" aria-hidden="true"><i></i><i></i><i></i></span>Supporters</p>
+      <h1 id="support-dialog-title">Vocelle is free because people chip in.</h1>
+      <div id="support-dialog-body">
+        <p class="support-lead">No ads, no account, no word limits. Vocelle keeps improving because the people who use it choose to fund it. Every contribution goes straight to XCollab, the small studio behind Vocelle, Texo and Maqala.</p>
+        <ul class="support-funds">
+          <li><b>Fixes</b> keeping Vocelle working as Windows and Linux change</li>
+          <li><b>Infrastructure</b> building, testing and publishing each release</li>
+          <li><b>What's next</b> new features, and the next product</li>
+        </ul>
+      </div>
+      <div class="support-actions">
+        <button type="button" class="subtle" id="support-later">Maybe later</button>
+        <button type="button" class="primary" id="support-go">
+          Become a supporter
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
+        </button>
+      </div>
+      <p class="support-note">Opens the XCollab support page in your browser. Any amount from $20, as one payment through Polar, which sends your receipt.</p>
+    </dialog>
 
     <div class="toast" id="save-state" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>

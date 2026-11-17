@@ -17,7 +17,7 @@
 <p align="center">
   <a href="https://github.com/codewithdark-git/vocelle/releases/latest"><b>Download</b></a>
   ·
-  <a href="https://codewithdark-git.github.io/vocelle/">Website</a>
+  <a href="https://xcollab.pages.dev/products/vocelle">Website</a>
   ·
   <a href="#quick-start">Quick start</a>
   ·

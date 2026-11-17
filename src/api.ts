@@ -84,6 +84,7 @@ export const api = {
   copyText: (text: string) => invoke<void>("copy_text", { text }),
   getStats: () => invoke<Stats>("get_stats"),
   testMicrophone: (microphone: string | null) => invoke<number>("test_microphone", { microphone }),
+  openSupportPage: () => invoke<void>("open_support_page"),
 };
 
 const errorBox = () => document.getElementById("error")!;

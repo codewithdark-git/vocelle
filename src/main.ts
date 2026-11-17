@@ -241,12 +241,36 @@ function initText(): void {
   void renderPreview();
 }
 
+// ---------- Support ----------
+
+function initSupport(): void {
+  const dialog = $<HTMLDialogElement>("support-dialog");
+  const close = () => dialog.close();
+  $("support-open").onclick = () => dialog.showModal();
+  $("support-close").onclick = close;
+  $("support-later").onclick = close;
+  // A click on the backdrop (outside the card) closes it.
+  dialog.onclick = (event) => {
+    if (event.target === dialog) close();
+  };
+  $("support-go").onclick = async () => {
+    try {
+      await api.openSupportPage();
+      close();
+    } catch (err) {
+      close();
+      showError(String(err));
+    }
+  };
+}
+
 // ---------- Start ----------
 
 async function start(): Promise<void> {
   document.querySelectorAll<HTMLButtonElement>("[role=tab]").forEach((tab) => {
     tab.onclick = () => showTab(tab.dataset.tab!);
   });
+  initSupport();
   try {
     const [info, loaded, available] = await Promise.all([api.appInfo(), api.getSettings(), api.choices()]);
     $("version").textContent = `v${info.version}`;

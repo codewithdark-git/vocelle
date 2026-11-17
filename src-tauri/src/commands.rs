@@ -135,6 +135,34 @@ pub fn copy_text(text: String) -> Result<(), String> {
         .map_err(|e| format!("Couldn't copy: {e}"))
 }
 
+/// The studio's support page, opened at its contribution section.
+const SUPPORT_URL: &str = "https://xcollab.pages.dev/support#contribute";
+
+/// Opens the support page in the default browser. The address is fixed here,
+/// so the window can't use this to open anything else.
+#[tauri::command]
+pub fn open_support_page() -> Result<(), String> {
+    #[cfg(windows)]
+    let result = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", SUPPORT_URL])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+    };
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(SUPPORT_URL).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open")
+        .arg(SUPPORT_URL)
+        .spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|e| format!("Couldn't open your browser ({e}). The support page is {SUPPORT_URL}"))
+}
+
 #[tauri::command]
 pub fn get_stats(app: AppHandle, history: State<'_, History>) -> Stats {
     history.stats(&app)

@@ -84,6 +84,7 @@ pub fn run() {
             commands::copy_text,
             commands::get_stats,
             commands::test_microphone,
+            commands::open_support_page,
             speech::list_models,
             speech::download_model,
             speech::select_model,
