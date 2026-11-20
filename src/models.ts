@@ -8,6 +8,11 @@ interface ModelEvent {
   error: string | null;
 }
 
+interface DownloadEvent extends ModelEvent {
+  /** The user cancelled it: not an error. */
+  cancelled: boolean;
+}
+
 interface Progress {
   id: string;
   done: number;
@@ -17,6 +22,7 @@ interface Progress {
 const list = () => document.getElementById("models")!;
 const progress = new Map<string, number>();
 const loading = new Set<string>();
+const cancelling = new Set<string>();
 let onChange: (models: ModelStatus[]) => void = () => {};
 
 function formatSize(bytes: number): string {
@@ -34,7 +40,15 @@ function modelRow(m: ModelStatus): HTMLLIElement {
   if (m.downloading || pct !== undefined) {
     const bar = el("progress", { max: 100, value: pct ?? 0 });
     bar.dataset.id = m.id;
-    action.append(bar);
+    bar.setAttribute("aria-label", `Downloading ${m.name}`);
+    const stopping = cancelling.has(m.id);
+    const cancel = el(
+      "button",
+      { className: "subtle", type: "button", disabled: stopping, onclick: () => void cancelDownload(m.id) },
+      stopping ? "Stopping…" : "Cancel",
+    );
+    action.classList.add("downloading");
+    action.append(bar, cancel);
   } else if (!m.downloaded) {
     action.append(el("button", { className: "primary", onclick: () => void download(m.id) }, "Download"));
   } else if (m.selected) {
@@ -68,6 +82,12 @@ async function download(id: string): Promise<void> {
   });
 }
 
+async function cancelDownload(id: string): Promise<void> {
+  cancelling.add(id);
+  await refreshModels();
+  await api.cancelDownload(id).catch((err) => showError(String(err)));
+}
+
 async function select(id: string): Promise<void> {
   showError(null);
   loading.add(id);
@@ -88,9 +108,10 @@ export function initModels(changed: (models: ModelStatus[]) => void): void {
     else void refreshModels();
   });
 
-  void listen<ModelEvent>("model-downloaded", ({ payload }) => {
+  void listen<DownloadEvent>("model-downloaded", ({ payload }) => {
     progress.delete(payload.id);
-    showError(payload.error);
+    cancelling.delete(payload.id);
+    showError(payload.error ? `Couldn't download the model. ${payload.error}` : null);
     void refreshModels();
   });
 

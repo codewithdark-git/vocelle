@@ -74,6 +74,33 @@
             <div class="hero-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
           </div>
 
+          <div class="notice alert-notice" id="key-notice" role="alert" hidden>
+            <div>
+              <b>The talk key isn't working.</b>
+              <p>Vocelle couldn't listen for key presses, so holding the key won't start a dictation. Restart Vocelle to try again.</p>
+              <p class="notice-detail" id="key-notice-detail"></p>
+            </div>
+          </div>
+
+          <div class="notice" id="wayland-notice" hidden>
+            <div>
+              <b>The talk key needs an X11 session for now.</b>
+              <p>On Wayland, Vocelle can't hear key presses in other apps yet. Choose an "Xorg" or "X11" session on the login screen to dictate.</p>
+            </div>
+          </div>
+
+          <!-- The live region stays in place so a new problem is announced when the card appears. -->
+          <div id="problem-region" aria-live="polite">
+            <div class="notice alert-notice" id="problem-card" hidden>
+              <div>
+                <b>Last problem <span class="notice-time" id="problem-time"></span></b>
+                <p class="problem-message" id="problem-message"></p>
+                <p id="problem-hint"></p>
+              </div>
+              <button type="button" class="subtle" id="problem-dismiss">Dismiss</button>
+            </div>
+          </div>
+
           <div class="notice" id="slow-notice" hidden>
             <div>
               <b>Dictation is slow on this PC.</b>
@@ -266,6 +293,7 @@
           <h1>Get the speech model</h1>
           <p class="lead">A one-time download. After this, Vocelle works offline.</p>
           <div class="model-pick" id="welcome-model"></div>
+          <p class="note bad" id="welcome-model-error" aria-live="polite"></p>
           <p class="note">You can switch models any time on the Models page.</p>
         </section>
 
@@ -277,6 +305,7 @@
             <select id="welcome-key-select" aria-label="Talk key"></select>
             <button id="welcome-capture" type="button">Press a key…</button>
           </div>
+          <p class="note bad" id="welcome-wayland" hidden>On Wayland the talk key doesn't work yet. Choose an "Xorg" or "X11" session on the login screen to dictate.</p>
         </section>
 
         <section class="step" data-step="try" hidden>

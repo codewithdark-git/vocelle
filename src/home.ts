@@ -1,7 +1,7 @@
 // Home page: greeting, totals and recent dictations grouped by day.
 import { listen } from "@tauri-apps/api/event";
 
-import { api, el, showError, type HistoryEntry, type Stats } from "./api";
+import { api, el, showError, type HistoryEntry, type Problem, type Stats } from "./api";
 
 /** Typing speed used to estimate time saved; a common average for typists. */
 const TYPING_WPM = 40;
@@ -61,9 +61,31 @@ function row(entry: HistoryEntry): HTMLDivElement {
 
 let historyEnabled = true;
 
+/** Shows the last dictation problem, or hides the card when there is none. */
+function renderProblem(problem: Problem | null): void {
+  $("problem-card").hidden = !problem;
+  if (!problem) return;
+  const at = new Date(problem.time);
+  const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  $("problem-time").textContent = dayLabel(problem.time) === "Today" ? time : `${dayLabel(problem.time)}, ${time}`;
+  $("problem-message").textContent = problem.message;
+  $("problem-hint").textContent = problem.hint;
+}
+
+async function renderKeyNotice(): Promise<void> {
+  const reason = await api.talkKeyProblem().catch(() => null);
+  $("key-notice").hidden = !reason;
+  $("key-notice-detail").textContent = reason ? `Reason: ${reason}` : "";
+}
+
 export async function refreshHome(enabled = historyEnabled): Promise<void> {
   historyEnabled = enabled;
   $("greeting").textContent = greeting();
+  void renderKeyNotice();
+  void api
+    .lastProblem()
+    .then(renderProblem)
+    .catch(() => renderProblem(null));
 
   const stats = await api
     .getStats()
@@ -139,6 +161,11 @@ export function initHome(): void {
     await api.clearHistory();
     await refreshHome();
   };
+  $("problem-dismiss").onclick = async () => {
+    renderProblem(null);
+    await api.dismissProblem().catch(() => {});
+  };
+  void listen<Problem>("dictation-error", ({ payload }) => renderProblem(payload));
   // New dictations happen in other apps; show them when the user comes back.
   window.addEventListener("focus", () => void refreshHome());
 }

@@ -10,8 +10,10 @@ mod keys;
 mod log;
 mod models;
 mod overlay;
+mod problem;
 mod settings;
 mod speech;
+mod store_io;
 mod tray;
 
 use tauri::{Manager, WindowEvent};
@@ -27,6 +29,8 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
 }
 
 pub fn run() {
+    // First, so even a panic during startup is logged (once the log folder is set).
+    log::install_panic_hook();
     tauri::Builder::default()
         // Must be registered first so a second launch exits before doing any setup.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -39,11 +43,23 @@ pub fn run() {
         .manage(asr::Engine::default())
         .manage(speech::Downloads::default())
         .manage(history::History::default())
+        .manage(problem::Problems::default())
+        .manage(dictation::Shared::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_local_data_dir() {
                 log::init(dir);
             }
             log::write(&format!("Vocelle {} starting", app.package_info().version));
+            if let Some(line) = log::take_crash_marker() {
+                log::write(&format!("the last run crashed: {line}"));
+                problem::report(
+                    app.handle(),
+                    "Vocelle ran into an internal error and closed last time.",
+                );
+            }
+            if commands::wayland_session() {
+                log::write("Wayland session: the talk key needs an X11 session for now");
+            }
             app.manage(settings::Store::load(app.handle()));
             // The Settings window is created only now, after the state its
             // commands use is registered (it has `"create": false` in the config).
@@ -82,11 +98,16 @@ pub fn run() {
             commands::delete_history_entry,
             commands::clear_history,
             commands::copy_text,
+            commands::paste_last,
             commands::get_stats,
             commands::test_microphone,
             commands::open_support_page,
+            commands::talk_key_problem,
+            problem::last_problem,
+            problem::dismiss_problem,
             speech::list_models,
             speech::download_model,
+            speech::cancel_download,
             speech::select_model,
         ])
         .run(tauri::generate_context!())

@@ -142,6 +142,8 @@ function initGeneral(): void {
   language.onchange = () => {
     settings.language = language.value;
     scheduleSave(0);
+    // Fillers and "i" → "I" depend on the language.
+    void renderPreview();
   };
 
   const autostart = $<HTMLInputElement>("autostart");
@@ -168,15 +170,15 @@ function initGeneral(): void {
 
 const CLEANUP_HELP: Record<Settings["cleanup"], string> = {
   off: "Types exactly what the model heard.",
-  light: "Removes “um”, “uh” and similar, and fixes spacing.",
-  full: "Light, plus stutters (“the the”), sentence capitals and “i” → “I”.",
+  light: "Removes filler sounds like “um” and “uh”, and fixes spacing.",
+  full: "Light, plus stutters (“the the”), sentence capitals and “i” → “I” in English.",
 };
 
 async function renderPreview(): Promise<void> {
   $("cleanup-help").textContent = CLEANUP_HELP[settings.cleanup];
   const input = $<HTMLInputElement>("preview-input").value;
   $("preview-output").textContent = await api
-    .previewCleanup(input, settings.cleanup, settings.replacements)
+    .previewCleanup(input, settings.cleanup, settings.language, settings.replacements)
     .catch(() => input);
 }
 
@@ -274,6 +276,8 @@ async function start(): Promise<void> {
   try {
     const [info, loaded, available] = await Promise.all([api.appInfo(), api.getSettings(), api.choices()]);
     $("version").textContent = `v${info.version}`;
+    $("wayland-notice").hidden = !info.wayland;
+    $("welcome-wayland").hidden = !info.wayland;
     settings = loaded;
     choices = available;
   } catch (err) {

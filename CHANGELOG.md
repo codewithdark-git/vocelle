@@ -6,6 +6,68 @@ All notable changes to Vocelle are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-20
+
+Vocelle no longer loses your words or quietly mangles them.
+
+### Added
+
+- **Paste last dictation** in the tray menu. It pastes your last dictation
+  again, or copies it when Vocelle's own window has focus, so you can press
+  Ctrl+V where you want it.
+- **Last problem card on Home.** When something goes wrong while you're in
+  another app, Home keeps the message and a next step until you dismiss it.
+- **Cancel model downloads.** A cancelled or interrupted download picks up
+  where it stopped the next time you click Download.
+- Home says when the talk key can't work: when Vocelle couldn't listen for
+  key presses, or on a Linux Wayland session (the welcome setup says so too).
+
+### Changed
+
+- **Text that can't be typed is copied instead of lost.** If pasting fails
+  (for example into an app run as administrator), your text stays on the
+  clipboard and the indicator says to press Ctrl+V. It's also kept for Paste
+  last dictation.
+- **Recordings that reach the 5-minute limit are copied, not pasted**, in
+  case the talk key got stuck. Press Ctrl+V to paste them.
+- **Errors are readable.** The indicator shows a short reason, for example
+  "Can't type into an app running as administrator", and screen readers hear
+  the full message.
+- **Cleanup knows the language you spoke.** Filler words are removed only in
+  English, German, French, Dutch and Italian, and only sounds that are never
+  real words there. Other languages keep every word.
+- Model downloads time out when the connection stalls, try again on their
+  own a couple of times, and come from fixed versions of the model files.
+
+### Fixed
+
+- **Real words deleted by Light cleanup** in other languages: German "um"
+  and "er", Dutch "er" and Portuguese "um" are words, not fillers.
+- **Full cleanup broke web addresses and file names**: "example.com" no
+  longer becomes "example.Com", and the word after "e.g." keeps its case.
+- **A dictation made while the model was still loading was thrown away**,
+  with a wrong "download a model" message. It now waits for the model.
+- **A key-up that never arrived** (for example when the admin prompt opened
+  mid-dictation) kept the microphone on until the 5-minute limit, and the
+  next press was ignored. The talk key is now released, and the next press
+  starts a new dictation.
+- **Settings, history and totals could be lost** after a crash or power
+  cut, or reset by one bad value. They're saved safely with a backup, a bad
+  value only resets that one setting, and a damaged file is kept aside.
+  A settings file that can't be read at start-up (a virus scanner holding
+  it, say) is never overwritten with defaults.
+- **Back-to-back dictations could paste the wrong text** into a slow app.
+  Your clipboard is put back in the background, and only if you haven't
+  copied something else since.
+- **Copied text could vanish on Linux** without a clipboard manager.
+- **A talk-key press made while the last dictation was still being
+  transcribed could be ignored** on a busy computer. Vocelle now listens for
+  the talk key ahead of other work.
+- A failed VAD (voice detection) download no longer fails the model
+  download.
+- On a processor without AVX2, Vocelle says so instead of closing.
+- Crashes and talk-key failures are written to `vocelle.log`.
+
 ## [0.3.2] - 2026-11-03
 
 The real fix for slow dictation in the installed app.
@@ -195,7 +257,8 @@ transcribed entirely on your PC.
   dictating are cleared.
 - The talk key can't be changed yet.
 
-[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/codewithdark-git/vocelle/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/codewithdark-git/vocelle/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/codewithdark-git/vocelle/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/codewithdark-git/vocelle/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/codewithdark-git/vocelle/compare/v0.2.0...v0.3.0

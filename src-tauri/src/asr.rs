@@ -5,7 +5,11 @@
 //! only covers the clip, one decoding state is reused, and the model is warmed
 //! up as soon as it loads.
 
-use std::{path::Path, sync::Mutex, time::Instant};
+use std::{
+    path::Path,
+    sync::{Condvar, Mutex, RwLock},
+    time::{Duration, Instant},
+};
 
 use whisper_rs::{
     FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
@@ -46,6 +50,16 @@ pub struct Options {
     pub prompt: Option<String>,
 }
 
+/// What the speech model heard.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Transcript {
+    /// Empty when there was no speech.
+    pub text: String,
+    /// The language Whisper transcribed in, such as "en": the one set in
+    /// Settings, or the detected one with "auto". `None` when Whisper didn't run.
+    pub language: Option<&'static str>,
+}
+
 struct Loaded {
     model: &'static ModelInfo,
     /// Reused between dictations; creating a state allocates the model's buffers.
@@ -56,7 +70,70 @@ struct Loaded {
 /// The loaded model, shared between the dictation thread and settings commands.
 #[derive(Default)]
 pub struct Engine {
+    /// Held for a whole transcription.
     loaded: Mutex<Option<Loaded>>,
+    /// The loaded model's id, kept apart from `loaded` so the Settings window
+    /// can read it while a long transcription holds that lock.
+    loaded_id: RwLock<Option<&'static str>>,
+    loads: Mutex<Loads>,
+    /// Signalled when the latest load ends.
+    load_done: Condvar,
+    /// Held while a model is read from disk, so two loads never run (and
+    /// fill memory) at once.
+    serial: Mutex<()>,
+}
+
+/// Which load request may change the model. Each request takes a ticket, and
+/// only the latest one counts, so picking models quickly one after another
+/// always ends with the last one picked.
+#[derive(Debug, Default)]
+struct Loads {
+    /// The latest ticket handed out.
+    latest: u64,
+    /// The model the latest request is loading, until it's done.
+    loading: Option<&'static str>,
+    /// Why the latest load failed, until the next one starts.
+    failed: Option<String>,
+}
+
+/// A load request, from [`Engine::begin_load`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ticket(u64);
+
+impl Loads {
+    fn begin(&mut self, id: &'static str) -> Ticket {
+        self.latest += 1;
+        self.loading = Some(id);
+        self.failed = None;
+        Ticket(self.latest)
+    }
+
+    fn is_current(&self, ticket: Ticket) -> bool {
+        ticket.0 == self.latest
+    }
+
+    /// Ends `ticket`'s load. Returns false, changing nothing, when a newer
+    /// request has replaced it.
+    fn finish(&mut self, ticket: Ticket, error: Option<String>) -> bool {
+        if !self.is_current(ticket) {
+            return false;
+        }
+        self.loading = None;
+        self.failed = error;
+        true
+    }
+
+    /// Why there's no model to transcribe with. Only says to download one
+    /// when no model is being loaded and none failed to load.
+    fn not_loaded_message(&self) -> String {
+        if self.loading.is_some() {
+            "The speech model is still loading. Try again in a moment.".to_owned()
+        } else if let Some(error) = &self.failed {
+            error.clone()
+        } else {
+            "No speech model yet. Download one in Vocelle settings.".to_owned()
+        }
+    }
 }
 
 /// Threads for whisper.cpp: every logical core, up to 8. Measured on a
@@ -67,15 +144,96 @@ fn threads() -> i32 {
         .min(8) as i32
 }
 
+/// CPU features whisper.cpp is built for (see `.cargo/config.toml`). Running
+/// it without them crashes the app with an illegal instruction.
+const REQUIRED_CPU: [&str; 4] = ["avx", "avx2", "fma", "f16c"];
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn cpu_has(feature: &str) -> bool {
+    match feature {
+        "avx" => std::is_x86_feature_detected!("avx"),
+        "avx2" => std::is_x86_feature_detected!("avx2"),
+        "fma" => std::is_x86_feature_detected!("fma"),
+        "f16c" => std::is_x86_feature_detected!("f16c"),
+        _ => true,
+    }
+}
+
+/// The x86 baseline doesn't apply to other CPUs.
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+fn cpu_has(_feature: &str) -> bool {
+    true
+}
+
+/// The required features `has` says are missing.
+fn missing_cpu_features(has: impl Fn(&str) -> bool) -> Vec<&'static str> {
+    REQUIRED_CPU.into_iter().filter(|f| !has(f)).collect()
+}
+
+/// What to tell the user when the CPU lacks `missing` features.
+fn unsupported_cpu_message(missing: &[&str]) -> Option<String> {
+    if missing.is_empty() {
+        return None;
+    }
+    let names: Vec<String> = missing.iter().map(|f| f.to_uppercase()).collect();
+    Some(format!(
+        "This CPU isn't supported yet (needs {}).",
+        names.join(", ")
+    ))
+}
+
+/// Why this CPU can't run the speech engine, if it can't.
+fn cpu_problem() -> Option<String> {
+    unsupported_cpu_message(&missing_cpu_features(cpu_has))
+}
+
 impl Engine {
-    /// Loads `model` from `model_path`, replacing any loaded model. `vad_path`
-    /// enables Silero voice-activity detection when the VAD model is present.
+    /// Starts a load request for `model`. Dictations wait for it (see
+    /// [`Engine::wait_for_load`]), and any earlier request that hasn't
+    /// finished yet won't replace the model any more.
+    pub fn begin_load(&self, id: &'static str) -> Ticket {
+        self.loads.lock().unwrap().begin(id)
+    }
+
+    /// Ends `ticket`'s request without loading anything, e.g. when the model
+    /// file is missing. Returns the error if the request was still current.
+    pub fn fail_load(&self, ticket: Ticket, error: String) -> Result<bool, String> {
+        self.end_load(ticket, Err(error))
+    }
+
+    /// Loads `model` from `model_path` for `ticket`, replacing any loaded
+    /// model. `vad_path` enables Silero voice-activity detection when the VAD
+    /// model is present. Returns `Ok(false)` when a newer request replaced
+    /// this one, which leaves the model as it is.
     pub fn load(
         &self,
+        ticket: Ticket,
         model: &'static ModelInfo,
         model_path: &Path,
         vad_path: Option<&Path>,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
+        let result = self.read_model(ticket, model, model_path, vad_path);
+        self.end_load(ticket, result)
+    }
+
+    /// Reads and warms up the model. `Ok(None)` when the request was replaced
+    /// before it started.
+    fn read_model(
+        &self,
+        ticket: Ticket,
+        model: &'static ModelInfo,
+        model_path: &Path,
+        vad_path: Option<&Path>,
+    ) -> Result<Option<Loaded>, String> {
+        let _serial = self.serial.lock().unwrap();
+        if !self.loads.lock().unwrap().is_current(ticket) {
+            log!("skipped loading {}: another model was picked", model.id);
+            return Ok(None);
+        }
+        // Checked first: on a CPU without these, whisper.cpp crashes the app.
+        if let Some(problem) = cpu_problem() {
+            return Err(problem);
+        }
         whisper_rs::install_logging_hooks();
         let started = Instant::now();
         let mut params = WhisperContextParameters::default();
@@ -105,39 +263,93 @@ impl Engine {
             started.elapsed().as_millis(),
             threads()
         );
-        *self.loaded.lock().unwrap() = Some(loaded);
-        Ok(())
+        Ok(Some(loaded))
+    }
+
+    /// Puts a loaded model in place if `ticket` is still the latest request,
+    /// and wakes dictations waiting for it.
+    fn end_load(
+        &self,
+        ticket: Ticket,
+        result: Result<Option<Loaded>, String>,
+    ) -> Result<bool, String> {
+        let outcome = match result {
+            Ok(None) => Ok(false),
+            Ok(Some(loaded)) => {
+                // Waits for a transcription in progress to finish.
+                let mut slot = self.loaded.lock().unwrap();
+                let mut loads = self.loads.lock().unwrap();
+                if loads.finish(ticket, None) {
+                    *self.loaded_id.write().unwrap() = Some(loaded.model.id);
+                    *slot = Some(loaded);
+                    Ok(true)
+                } else {
+                    log!("dropped {}: another model was picked", loaded.model.id);
+                    Ok(false)
+                }
+            }
+            Err(error) => {
+                if self
+                    .loads
+                    .lock()
+                    .unwrap()
+                    .finish(ticket, Some(error.clone()))
+                {
+                    Err(error)
+                } else {
+                    Ok(false)
+                }
+            }
+        };
+        self.load_done.notify_all();
+        outcome
     }
 
     pub fn loaded_model(&self) -> Option<&'static str> {
-        self.loaded.lock().unwrap().as_ref().map(|l| l.model.id)
+        *self.loaded_id.read().unwrap()
     }
 
-    /// Transcribes 16 kHz mono audio. Returns an empty string when there was no speech.
-    pub fn transcribe(&self, samples: &[f32], options: &Options) -> Result<String, String> {
+    /// Whether a model is being loaded (at start-up, or after picking one).
+    pub fn is_loading(&self) -> bool {
+        self.loads.lock().unwrap().loading.is_some()
+    }
+
+    /// Waits up to `timeout` for the model being loaded, if any.
+    pub fn wait_for_load(&self, timeout: Duration) {
+        let loads = self.loads.lock().unwrap();
+        let _ = self
+            .load_done
+            .wait_timeout_while(loads, timeout, |l| l.loading.is_some())
+            .unwrap();
+    }
+
+    /// Transcribes 16 kHz mono audio. The text is empty when there was no speech.
+    pub fn transcribe(&self, samples: &[f32], options: &Options) -> Result<Transcript, String> {
         let mut guard = self.loaded.lock().unwrap();
-        let loaded = guard
-            .as_mut()
-            .ok_or("No speech model yet. Download one in Vocelle settings.")?;
+        let Some(loaded) = guard.as_mut() else {
+            return Err(self.loads.lock().unwrap().not_loaded_message());
+        };
 
         let started = Instant::now();
         let speech = match &mut loaded.vad {
             Some(vad) => match speech_span(vad, samples) {
                 Some((from, to)) => &samples[from..to],
-                None => return Ok(String::new()),
+                None => return Ok(Transcript::default()),
             },
-            None if rms(samples) < SILENCE_RMS => return Ok(String::new()),
+            None if rms(samples) < SILENCE_RMS => return Ok(Transcript::default()),
             None => samples,
         };
         let text = run_whisper(loaded, speech, options)?;
+        let language = whisper_rs::get_lang_str(loaded.state.full_lang_id_from_state());
         log!(
-            "transcribed {:.1} s ({:.1} s of speech) in {} ms with {}",
+            "transcribed {:.1} s ({:.1} s of speech) in {} ms with {} ({})",
             samples.len() as f32 / TARGET_RATE as f32,
             speech.len() as f32 / TARGET_RATE as f32,
             started.elapsed().as_millis(),
-            loaded.model.id
+            loaded.model.id,
+            language.unwrap_or("unknown language")
         );
-        Ok(text)
+        Ok(Transcript { text, language })
     }
 
     /// Where `samples` can be cut at a pause between phrases, so the part before
@@ -316,6 +528,69 @@ mod tests {
     use super::*;
 
     #[test]
+    fn only_the_latest_load_counts() {
+        let mut loads = Loads::default();
+        let first = loads.begin("tiny");
+        let second = loads.begin("small");
+        assert!(!loads.is_current(first));
+        assert!(loads.is_current(second));
+        // The older request finishing changes nothing.
+        assert!(!loads.finish(first, Some("failed".into())));
+        assert_eq!(loads.loading, Some("small"));
+        assert_eq!(loads.failed, None);
+        assert!(loads.finish(second, None));
+        assert_eq!(loads.loading, None);
+    }
+
+    #[test]
+    fn a_failed_load_is_kept_until_the_next_one() {
+        let mut loads = Loads::default();
+        let ticket = loads.begin("small");
+        assert!(loads.finish(
+            ticket,
+            Some("This CPU isn't supported yet (needs AVX2).".into())
+        ));
+        assert_eq!(
+            loads.not_loaded_message(),
+            "This CPU isn't supported yet (needs AVX2)."
+        );
+        loads.begin("tiny");
+        assert_eq!(loads.failed, None);
+    }
+
+    #[test]
+    fn not_loaded_message_says_why() {
+        let mut loads = Loads::default();
+        assert!(loads.not_loaded_message().contains("Download one"));
+        let ticket = loads.begin("small");
+        assert!(loads.not_loaded_message().contains("still loading"));
+        loads.finish(ticket, None);
+        assert!(loads.not_loaded_message().contains("Download one"));
+    }
+
+    #[test]
+    fn cpu_check_names_missing_features() {
+        assert_eq!(missing_cpu_features(|_| true), Vec::<&str>::new());
+        assert_eq!(unsupported_cpu_message(&[]), None);
+        let missing = missing_cpu_features(|f| f == "avx");
+        assert_eq!(missing, ["avx2", "fma", "f16c"]);
+        assert_eq!(
+            unsupported_cpu_message(&["avx2"]).as_deref(),
+            Some("This CPU isn't supported yet (needs AVX2).")
+        );
+        assert_eq!(
+            unsupported_cpu_message(&missing).as_deref(),
+            Some("This CPU isn't supported yet (needs AVX2, FMA, F16C).")
+        );
+    }
+
+    #[test]
+    fn this_cpu_passes_the_check() {
+        // The tests themselves run code built for this baseline.
+        assert_eq!(cpu_problem(), None);
+    }
+
+    #[test]
     fn audio_ctx_scales_with_clip_length() {
         let second = TARGET_RATE as usize;
         assert_eq!(audio_ctx(3 * second), 384); // (3 + 1) s * 50 = 200, raised to the minimum
@@ -369,9 +644,11 @@ mod tests {
             .expect("base.en is in the catalog");
         let vad = std::env::var("VOCELLE_TEST_VAD").ok();
         let engine = Engine::default();
-        engine
-            .load(model, Path::new(&model_path), vad.as_deref().map(Path::new))
-            .unwrap();
+        let ticket = engine.begin_load(model.id);
+        let path = Path::new(&model_path);
+        assert!(engine
+            .load(ticket, model, path, vad.as_deref().map(Path::new))
+            .unwrap());
 
         let wavs = std::env::var("VOCELLE_TEST_WAV").expect("set VOCELLE_TEST_WAV");
         for wav in wavs.split(';') {
@@ -387,7 +664,10 @@ mod tests {
                 .map(|s| s.unwrap() as f32 / i16::MAX as f32)
                 .collect();
             let started = Instant::now();
-            let text = engine.transcribe(&samples, &Options::default()).unwrap();
+            let text = engine
+                .transcribe(&samples, &Options::default())
+                .unwrap()
+                .text;
             println!(
                 "{wav}: {:.1} s audio -> {} ms
   {text}",

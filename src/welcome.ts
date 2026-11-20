@@ -20,6 +20,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 let ctx: Context;
 let current = 0;
 let downloading: string | null = null;
+let stopping = false;
+let downloadError: string | null = null;
 
 function keyLabel(code: string): string {
   return ctx.choices().talk_keys.find((k) => k.code === code)?.label ?? code;
@@ -101,6 +103,7 @@ function formatSize(bytes: number): string {
 async function renderModel(): Promise<void> {
   const models = await api.listModels().catch(() => [] as ModelStatus[]);
   const box = $("welcome-model");
+  $("welcome-model-error").textContent = downloadError ? `Couldn't download the model. ${downloadError}` : "";
   const active = models.find((m) => m.selected && m.downloaded);
   const pick = models.find((m) => m.recommended) ?? models[0];
   if (!pick) return;
@@ -125,9 +128,18 @@ function modelCard(m: ModelStatus, state: string | null): HTMLElement {
   } else if (downloading === m.id || m.downloading) {
     const bar = el("progress", { max: 100, value: 0 });
     bar.id = "welcome-progress";
-    action.append(bar);
+    bar.setAttribute("aria-label", `Downloading ${m.name}`);
+    const cancel = el(
+      "button",
+      { className: "subtle", type: "button", disabled: stopping },
+      stopping ? "Stopping…" : "Cancel",
+    );
+    cancel.onclick = () => void cancelDownload(m.id);
+    action.classList.add("downloading");
+    action.append(bar, cancel);
   } else {
-    const button = el("button", { className: "primary", type: "button" }, "Download");
+    const label = downloadError ? "Try again" : "Download";
+    const button = el("button", { className: "primary", type: "button" }, label);
     button.onclick = () => void download(m.id);
     action.append(button);
   }
@@ -141,8 +153,20 @@ function modelCard(m: ModelStatus, state: string | null): HTMLElement {
 
 async function download(id: string): Promise<void> {
   downloading = id;
+  stopping = false;
+  downloadError = null;
   await renderModel();
-  await api.downloadModel(id).catch(() => (downloading = null));
+  await api.downloadModel(id).catch(async (err) => {
+    downloading = null;
+    downloadError = String(err);
+    await renderModel();
+  });
+}
+
+async function cancelDownload(id: string): Promise<void> {
+  stopping = true;
+  await renderModel();
+  await api.cancelDownload(id).catch(() => {});
 }
 
 function initModelEvents(): void {
@@ -150,13 +174,20 @@ function initModelEvents(): void {
     const bar = document.getElementById("welcome-progress") as HTMLProgressElement | null;
     if (bar && payload.id === downloading) bar.value = Math.floor((payload.done / payload.total) * 100);
   });
-  void listen<{ id: string; error: string | null }>("model-downloaded", async ({ payload }) => {
-    if (payload.id !== downloading) return;
-    downloading = null;
-    // Use the model the user just chose here, even if another was active.
-    if (!payload.error) await api.selectModel(payload.id).catch(() => {});
-    if (STEPS[current] === "model") await renderModel();
-  });
+  void listen<{ id: string; error: string | null; cancelled: boolean }>(
+    "model-downloaded",
+    async ({ payload }) => {
+      if (payload.id === downloading) {
+        downloading = null;
+        downloadError = payload.error;
+        // Use the model the user just chose here, even if another was active.
+        if (!payload.error && !payload.cancelled) await api.selectModel(payload.id).catch(() => {});
+      }
+      // A download started on the Models page may have ended too.
+      stopping = false;
+      if (STEPS[current] === "model") await renderModel();
+    },
+  );
   void listen("model-loaded", () => {
     if (STEPS[current] === "model") void renderModel();
   });

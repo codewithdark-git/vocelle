@@ -6,7 +6,7 @@
 
 use std::{
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc, Mutex,
     },
     time::Instant,
@@ -16,6 +16,8 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, Stream,
 };
+
+use crate::log::log;
 
 pub const TARGET_RATE: u32 = 16_000;
 
@@ -60,7 +62,14 @@ impl Recording {
         )));
         let level = Arc::new(AtomicU32::new(0));
 
-        let on_error = |err| eprintln!("vocelle: microphone stream error: {err}");
+        // Logged once per recording: a failing device can report the same error
+        // on every buffer.
+        let reported = AtomicBool::new(false);
+        let on_error = move |err| {
+            if !reported.swap(true, Ordering::Relaxed) {
+                log!("microphone stream error: {err}");
+            }
+        };
         let stream = match format {
             SampleFormat::F32 => {
                 let sink = Sink::new(&samples, &level, channels);

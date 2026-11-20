@@ -24,32 +24,113 @@ pub struct Replacement {
     pub to: String,
 }
 
-/// Hesitation sounds that never carry meaning. Words like "like" or "so" are
-/// left alone because they often do.
-const FILLERS: &[&str] = &[
-    "um", "umm", "uh", "uhh", "uh-huh", "er", "erm", "ah", "ahh", "hmm", "hm", "mm", "mhm",
+/// The language-specific rules for one dictation, picked from the language
+/// Whisper used. Languages without a table get only the language-neutral
+/// steps (spacing, capitals, stutters), so cleanup never deletes a real word
+/// it doesn't know.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lang {
+    English,
+    German,
+    French,
+    Dutch,
+    Italian,
+    Other,
+}
+
+impl Lang {
+    /// From a Whisper language code such as "en" or "de". "auto", an empty
+    /// code or an unknown one gives `Other`.
+    fn from_code(code: &str) -> Self {
+        match base_code(code).as_str() {
+            "en" => Lang::English,
+            "de" => Lang::German,
+            "fr" => Lang::French,
+            "nl" => Lang::Dutch,
+            "it" => Lang::Italian,
+            _ => Lang::Other,
+        }
+    }
+
+    /// Hesitation sounds that never carry meaning in this language. Words
+    /// like "like" or "so" are left alone because they often do, and so are
+    /// sounds that are real words elsewhere: German "er" (he) and "um" (at),
+    /// Dutch "er" (there), Portuguese "um" (a, one).
+    fn fillers(self) -> &'static [&'static str] {
+        match self {
+            Lang::English => &[
+                "um", "umm", "uh", "uhh", "uh-huh", "er", "erm", "ah", "ahh", "hmm", "hm", "mm",
+                "mhm",
+            ],
+            Lang::German => &["äh", "ähm", "öh", "öhm", "hmm", "hm", "mhm"],
+            Lang::French => &["euh", "heu", "hmm", "hm"],
+            Lang::Dutch => &["eh", "ehm", "uh", "uhm", "hmm", "hm"],
+            Lang::Italian => &["ehm", "hmm", "hm"],
+            Lang::Other => &[],
+        }
+    }
+
+    /// Words that are often said twice on purpose ("I had had enough",
+    /// German "die Frau, die die Zeitung liest"), so they're never treated as
+    /// a stutter.
+    fn deliberate_doubles(self) -> &'static [&'static str] {
+        match self {
+            Lang::English => &["had", "that"],
+            Lang::German => &["der", "die", "das"],
+            Lang::Dutch => &["dat", "die"],
+            _ => &[],
+        }
+    }
+}
+
+/// "en" from "en", "EN" or "en-US".
+fn base_code(code: &str) -> String {
+    code.trim()
+        .split(['-', '_'])
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+}
+
+/// Whether the language capitalizes nouns, so a capital in the middle of a
+/// sentence is part of the word and must be kept.
+pub fn capitalizes_nouns(language: &str) -> bool {
+    matches!(base_code(language).as_str(), "de" | "lb")
+}
+
+/// Words ending in a full stop that usually don't end a sentence, so Full
+/// doesn't capitalize the word after them. Compared in lowercase.
+const ABBREVIATIONS: &[&str] = &[
+    "e.g.", "i.e.", "etc.", "vs.", "cf.", "approx.", "mr.", "mrs.", "ms.", "dr.", "prof.", "z.b.",
+    "d.h.", "bzw.", "usw.", "ca.",
 ];
 
-pub fn clean(text: &str, level: Level, replacements: &[Replacement]) -> String {
+/// Cleans a transcript. `language` is the code Whisper transcribed in, such
+/// as "en" or "de"; "auto" or an unknown code skips the rules that only
+/// make sense in one language (fillers, "i" → "I").
+pub fn clean(text: &str, level: Level, language: &str, replacements: &[Replacement]) -> String {
     let replaced = apply_replacements(text.trim(), replacements);
     if level == Level::Off {
         return replaced;
     }
+    let lang = Lang::from_code(language);
     // Line breaks (e.g. from a dictionary rule) are kept; each line is cleaned on its own.
     replaced
         .split('\n')
-        .map(|line| clean_line(line, level))
+        .map(|line| clean_line(line, level, lang))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn clean_line(line: &str, level: Level) -> String {
-    let mut out = remove_fillers(line);
+fn clean_line(line: &str, level: Level, lang: Lang) -> String {
+    let mut out = remove_fillers(line, lang);
     if level == Level::Full {
-        out = remove_repeated_words(&out);
-        out = fix_standalone_i(&out);
+        out = remove_repeated_words(&out, lang);
+        if lang == Lang::English {
+            out = fix_standalone_i(&out);
+        }
     }
-    out = fix_spacing(&out);
+    out = fix_spacing(&out, lang);
     if level == Level::Full {
         capitalize_sentences(&out)
     } else {
@@ -70,11 +151,19 @@ fn split_word(token: &str) -> (&str, &str, &str) {
     (&token[..start], &token[start..end], &token[end..])
 }
 
-fn remove_fillers(text: &str) -> String {
+fn remove_fillers(text: &str, lang: Lang) -> String {
+    let fillers = lang.fillers();
+    if fillers.is_empty() {
+        return text.to_owned();
+    }
     let mut words: Vec<String> = Vec::new();
     for token in text.split_whitespace() {
         let (_, word, trail) = split_word(token);
-        if !FILLERS.contains(&word.to_lowercase().as_str()) {
+        // After a number it's a unit, not a sound: "5 mm".
+        let after_number = words
+            .last()
+            .is_some_and(|w| w.ends_with(|c: char| c.is_ascii_digit()));
+        if after_number || !fillers.contains(&word.to_lowercase().as_str()) {
             words.push(token.to_owned());
             continue;
         }
@@ -99,16 +188,19 @@ fn remove_fillers(text: &str) -> String {
         .to_owned()
 }
 
-fn remove_repeated_words(text: &str) -> String {
+fn remove_repeated_words(text: &str, lang: Lang) -> String {
     let mut out: Vec<&str> = Vec::new();
     for token in text.split_whitespace() {
         if let Some(prev) = out.last() {
             let (_, a, a_trail) = split_word(prev);
             let (_, b, _) = split_word(token);
+            let a_lower = a.to_lowercase();
             // "the the" is a stutter; "that, that" (with a comma) is deliberate.
             // Single letters other than "I" are skipped ("a a" is rare, "x x" may be math).
-            let stutter =
-                a.eq_ignore_ascii_case(b) && a_trail.is_empty() && (a.len() > 1 || a == "I");
+            let stutter = a_lower == b.to_lowercase()
+                && a_trail.is_empty()
+                && (a.chars().count() > 1 || a == "I")
+                && !lang.deliberate_doubles().contains(&a_lower.as_str());
             if stutter {
                 out.pop();
             }
@@ -132,12 +224,17 @@ fn fix_standalone_i(text: &str) -> String {
         .join(" ")
 }
 
-/// Collapses runs of whitespace and removes spaces before punctuation.
-fn fix_spacing(text: &str) -> String {
+/// Collapses runs of whitespace and removes spaces before punctuation. French
+/// keeps its space before "?", "!", ";" and ":".
+fn fix_spacing(text: &str, lang: Lang) -> String {
     let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut out = String::with_capacity(collapsed.len());
     for c in collapsed.chars() {
-        if matches!(c, ',' | '.' | '?' | '!' | ';' | ':') && out.ends_with(' ') {
+        let tight = match lang {
+            Lang::French => matches!(c, ',' | '.'),
+            _ => matches!(c, ',' | '.' | '?' | '!' | ';' | ':'),
+        };
+        if tight && out.ends_with(' ') {
             out.pop();
         }
         // Doubled punctuation left behind by removed words: ",," or ",."
@@ -160,66 +257,104 @@ fn capitalize_first(text: &str) -> String {
     }
 }
 
+/// Capitalizes the first letter of each sentence. A sentence ends at ".",
+/// "?" or "!" followed by whitespace, so "example.com", "main.rs",
+/// "me@example.com" and "3.5" are left alone, and so is the word after an
+/// abbreviation such as "e.g.".
 fn capitalize_sentences(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
+    // At the start of a sentence: the next letter is capitalized.
     let mut capitalize = true;
+    // Just after sentence-ending punctuation (and any closing quotes).
+    let mut ended = false;
     for c in text.chars() {
         if capitalize && c.is_alphabetic() {
             out.extend(c.to_uppercase());
             capitalize = false;
             continue;
         }
-        if matches!(c, '.' | '?' | '!') {
-            capitalize = true;
-        } else if !c.is_whitespace() && !matches!(c, '"' | '\'' | '(' | ')') {
-            // Digits and other characters end the "start of sentence" state,
-            // so "3.5" stays "3.5" and doesn't capitalize what follows.
-            capitalize = false;
-        }
         out.push(c);
-    }
-    out
-}
-
-fn apply_replacements(text: &str, replacements: &[Replacement]) -> String {
-    let mut out = text.to_owned();
-    for r in replacements {
-        let from = r.from.trim();
-        if from.is_empty() {
-            continue;
+        if matches!(c, '.' | '?' | '!' | '…') {
+            ended = !(c == '.' && ends_with_abbreviation(&out));
+        } else if c.is_whitespace() {
+            capitalize |= ended;
+            ended = false;
+        } else if ended && matches!(c, '"' | '\'' | ')' | '”' | '’' | '»') {
+            // A closing quote after the full stop: the sentence still ended.
+        } else if capitalize && matches!(c, '"' | '\'' | '(' | '“' | '‘' | '«' | '¿' | '¡') {
+            // An opening quote before the first word.
+        } else {
+            // Digits and other characters end the "start of sentence" state,
+            // so "3 apples" and "3.5" stay as they are.
+            capitalize = false;
+            ended = false;
         }
-        // `to` isn't trimmed, so a rule can produce a line break or trailing space.
-        out = replace_whole_word(&out, from, &r.to);
     }
     out
 }
 
-/// Replaces `from` (one or more words) case-insensitively, only at word boundaries.
-fn replace_whole_word(text: &str, from: &str, to: &str) -> String {
-    let lower_text = text.to_lowercase();
-    let lower_from = from.to_lowercase();
-    // Lowercasing can change byte lengths for some scripts; fall back to exact matching then.
-    if lower_text.len() != text.len() || lower_from.len() != from.len() {
-        return text.replace(from, to);
+/// Whether the last word of `text` (ending in ".") is a known abbreviation.
+fn ends_with_abbreviation(text: &str) -> bool {
+    let word = text
+        .rsplit(char::is_whitespace)
+        .next()
+        .unwrap_or_default()
+        .trim_start_matches(['"', '\'', '(', '“', '‘', '«'])
+        .to_lowercase();
+    ABBREVIATIONS.contains(&word.as_str())
+}
+
+/// Applies the personal dictionary in one pass: at each word start the
+/// longest matching rule wins, so one rule's output is never replaced again
+/// by another. Matching is whole-word and case-insensitive, and works on
+/// characters, so letters that change length when lowercased ("İ") are safe.
+fn apply_replacements(text: &str, replacements: &[Replacement]) -> String {
+    let mut rules: Vec<(Vec<char>, &str)> = replacements
+        .iter()
+        .filter_map(|r| {
+            let from = r.from.trim();
+            // `to` isn't trimmed, so a rule can produce a line break or trailing space.
+            (!from.is_empty()).then(|| (from.chars().collect(), r.to.as_str()))
+        })
+        .collect();
+    if rules.is_empty() {
+        return text.to_owned();
     }
-    let is_word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '\'');
+    // Stable, so rules of the same length keep the order they were added in.
+    rules.sort_by_key(|(from, _)| std::cmp::Reverse(from.len()));
+
+    let chars: Vec<char> = text.chars().collect();
+    let is_word = |c: Option<&char>| c.is_some_and(|&c| c.is_alphanumeric() || c == '\'');
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
-    while let Some(pos) = lower_text[i..].find(&lower_from) {
-        let start = i + pos;
-        let end = start + from.len();
-        let before = text[..start].chars().next_back();
-        let after = text[end..].chars().next();
-        out.push_str(&text[i..start]);
-        if is_word(before) || is_word(after) {
-            out.push_str(&text[start..end]);
-        } else {
-            out.push_str(to);
+    while i < chars.len() {
+        let at_word_start = i == 0 || !is_word(chars.get(i - 1));
+        let rule = rules.iter().find(|(from, _)| {
+            let end = i + from.len();
+            at_word_start
+                && end <= chars.len()
+                && same_letters(&chars[i..end], from)
+                && !is_word(chars.get(end))
+        });
+        match rule {
+            Some((from, to)) => {
+                out.push_str(to);
+                i += from.len();
+            }
+            None => {
+                out.push(chars[i]);
+                i += 1;
+            }
         }
-        i = end;
     }
-    out.push_str(&text[i..]);
     out
+}
+
+/// Case-insensitive comparison of two equally long runs of characters.
+fn same_letters(a: &[char], b: &[char]) -> bool {
+    a.iter()
+        .zip(b)
+        .all(|(x, y)| x == y || x.to_lowercase().eq(y.to_lowercase()))
 }
 
 /// Builds a Whisper prompt from dictionary words, which biases recognition
@@ -244,17 +379,17 @@ mod tests {
     use super::*;
 
     fn light(s: &str) -> String {
-        clean(s, Level::Light, &[])
+        clean(s, Level::Light, "en", &[])
     }
 
     fn full(s: &str) -> String {
-        clean(s, Level::Full, &[])
+        clean(s, Level::Full, "en", &[])
     }
 
     #[test]
     fn off_keeps_text_as_is() {
         assert_eq!(
-            clean("  um so  i think ", Level::Off, &[]),
+            clean("  um so  i think ", Level::Off, "en", &[]),
             "um so  i think"
         );
     }
@@ -333,16 +468,16 @@ mod tests {
             },
         ];
         assert_eq!(
-            clean("open vocel and review the PR", Level::Off, &r),
+            clean("open vocel and review the PR", Level::Off, "en", &r),
             "open Vocelle and review the PR"
         );
         assert_eq!(
-            clean("open Vocel. approve pr.", Level::Off, &r),
+            clean("open Vocel. approve pr.", Level::Off, "en", &r),
             "open Vocelle. approve PR."
         );
         // Not inside other words.
         assert_eq!(
-            clean("vocelling and prize", Level::Off, &r),
+            clean("vocelling and prize", Level::Off, "en", &r),
             "vocelling and prize"
         );
     }
@@ -354,11 +489,11 @@ mod tests {
             to: "\n".into(),
         }];
         assert_eq!(
-            clean("first new line second", Level::Off, &r),
+            clean("first new line second", Level::Off, "en", &r),
             "first \n second"
         );
         assert_eq!(
-            clean("first new line um second", Level::Full, &r),
+            clean("first new line um second", Level::Full, "en", &r),
             "First\nSecond"
         );
     }
@@ -372,7 +507,285 @@ mod tests {
             from: "İstanbul".into(),
             to: "Istanbul".into(),
         }];
-        assert_eq!(clean("go to İstanbul", Level::Off, &r), "go to Istanbul");
+        assert_eq!(
+            clean("go to İstanbul", Level::Off, "en", &r),
+            "go to Istanbul"
+        );
+    }
+
+    /// Golden regression corpus: (language, level, what Whisper heard,
+    /// what gets typed). Every rule change has to keep these.
+    const CORPUS: &[(&str, Level, &str, &str)] = &[
+        // English fillers and stutters.
+        (
+            "en",
+            Level::Light,
+            "Um, so I think, uh, we should go.",
+            "So I think we should go.",
+        ),
+        (
+            "en",
+            Level::Light,
+            "Let's meet tomorrow, um.",
+            "Let's meet tomorrow.",
+        ),
+        (
+            "en",
+            Level::Light,
+            "The umbrella is in the hmmer room.",
+            "The umbrella is in the hmmer room.",
+        ),
+        (
+            "en",
+            Level::Light,
+            "The bolt is 5 mm wide.",
+            "The bolt is 5 mm wide.",
+        ),
+        (
+            "en",
+            Level::Full,
+            "um so i think the the plan works, uh, for friday. i'll send it",
+            "So I think the plan works for friday. I'll send it",
+        ),
+        ("en", Level::Full, "I I agree", "I agree"),
+        (
+            "en",
+            Level::Full,
+            "she had had enough",
+            "She had had enough",
+        ),
+        (
+            "en",
+            Level::Full,
+            "he said that that was fine",
+            "He said that that was fine",
+        ),
+        // English rules don't apply to other languages.
+        (
+            "de",
+            Level::Light,
+            "Er kommt um 3 Uhr.",
+            "Er kommt um 3 Uhr.",
+        ),
+        (
+            "de",
+            Level::Full,
+            "Äh, er kommt um 3 Uhr, ähm, oder später.",
+            "Er kommt um 3 Uhr oder später.",
+        ),
+        (
+            "de",
+            Level::Full,
+            "die Frau, die die Zeitung liest",
+            "Die Frau, die die Zeitung liest",
+        ),
+        (
+            "de",
+            Level::Full,
+            "ich weiß, i bin da",
+            "Ich weiß, i bin da",
+        ),
+        ("pt", Level::Light, "Eu quero um café.", "Eu quero um café."),
+        (
+            "pt",
+            Level::Full,
+            "é um bom dia. ah sim",
+            "É um bom dia. Ah sim",
+        ),
+        (
+            "nl",
+            Level::Light,
+            "Er is, eh, niemand thuis.",
+            "Er is niemand thuis.",
+        ),
+        ("nl", Level::Light, "Is er nog koffie?", "Is er nog koffie?"),
+        (
+            "fr",
+            Level::Light,
+            "Euh, tu viens ce soir ?",
+            "Tu viens ce soir ?",
+        ),
+        ("es", Level::Light, "um, hola", "Um, hola"),
+        // Unknown or undetected language: nothing language-specific.
+        ("auto", Level::Light, "um yes", "Um yes"),
+        ("", Level::Full, "um i agree", "Um i agree"),
+        // Region codes count as their language.
+        ("en-US", Level::Light, "uh, ok", "Ok"),
+        // URLs, domains, emails, file names and decimals keep their case.
+        (
+            "en",
+            Level::Full,
+            "go to example.com. then sign in",
+            "Go to example.com. Then sign in",
+        ),
+        (
+            "en",
+            Level::Full,
+            "open https://docs.example.org/guide.html now",
+            "Open https://docs.example.org/guide.html now",
+        ),
+        (
+            "en",
+            Level::Full,
+            "mail me at jane.doe@example.co.uk today",
+            "Mail me at jane.doe@example.co.uk today",
+        ),
+        (
+            "en",
+            Level::Full,
+            "edit main.rs and lib.rs",
+            "Edit main.rs and lib.rs",
+        ),
+        (
+            "en",
+            Level::Full,
+            "version 3.5 is out. ship it",
+            "Version 3.5 is out. Ship it",
+        ),
+        (
+            "en",
+            Level::Full,
+            "it costs 2.50 dollars",
+            "It costs 2.50 dollars",
+        ),
+        // Abbreviations don't end a sentence.
+        (
+            "en",
+            Level::Full,
+            "bring fruit, e.g. apples. and bread",
+            "Bring fruit, e.g. apples. And bread",
+        ),
+        (
+            "en",
+            Level::Full,
+            "use a tool, i.e. a hammer",
+            "Use a tool, i.e. a hammer",
+        ),
+        (
+            "en",
+            Level::Full,
+            "pens, paper etc. are here",
+            "Pens, paper etc. are here",
+        ),
+        ("en", Level::Full, "ask dr. smith", "Ask dr. smith"),
+        (
+            "de",
+            Level::Full,
+            "Obst, z.B. Äpfel. danach Brot",
+            "Obst, z.B. Äpfel. Danach Brot",
+        ),
+        // Sentence ends still capitalize, also after quotes and ellipses.
+        (
+            "en",
+            Level::Full,
+            "send it. then call! ok? yes",
+            "Send it. Then call! Ok? Yes",
+        ),
+        (
+            "en",
+            Level::Full,
+            "he said \"go.\" then left",
+            "He said \"go.\" Then left",
+        ),
+        ("en", Level::Full, "wait... then go", "Wait... Then go"),
+        (
+            "en",
+            Level::Full,
+            "über straße, um, café. ändern",
+            "Über straße café. Ändern",
+        ),
+        // French keeps the space before "?" and "!".
+        (
+            "fr",
+            Level::Full,
+            "c'est vrai ! d'accord",
+            "C'est vrai ! D'accord",
+        ),
+        ("en", Level::Light, "hello  ,  world !", "Hello, world!"),
+    ];
+
+    #[test]
+    fn golden_corpus() {
+        let failures: Vec<String> = CORPUS
+            .iter()
+            .filter_map(|&(lang, level, input, expected)| {
+                let got = clean(input, level, lang, &[]);
+                (got != expected).then(|| {
+                    format!(
+                        "[{lang} {level:?}] {input:?}
+  expected {expected:?}
+  got      {got:?}"
+                    )
+                })
+            })
+            .collect();
+        assert!(
+            failures.is_empty(),
+            "
+{}",
+            failures.join(
+                "
+"
+            )
+        );
+    }
+
+    #[test]
+    fn unicode_replacements_are_whole_word() {
+        let rule = |from: &str, to: &str| Replacement {
+            from: from.into(),
+            to: to.into(),
+        };
+        // "İ" grows when lowercased; matching used to fall back to plain
+        // substring replacement then, which changed "book" to "boOK".
+        let r = vec![rule("ok", "OK")];
+        assert_eq!(
+            clean("İzmir book Ok ok", Level::Off, "en", &r),
+            "İzmir book OK OK"
+        );
+        let r = vec![rule("über", "Über"), rule("straße", "Straße")];
+        assert_eq!(
+            clean("ÜBER die straße, überall", Level::Off, "de", &r),
+            "Über die Straße, überall"
+        );
+        let r = vec![rule("кот", "Кот")];
+        assert_eq!(
+            clean("мой кот, котёнок", Level::Off, "", &r),
+            "мой Кот, котёнок"
+        );
+        let r = vec![rule("東京", "Tokyo")];
+        assert_eq!(clean("東京 に", Level::Off, "", &r), "Tokyo に");
+    }
+
+    #[test]
+    fn replacements_run_once_with_the_longest_rule_first() {
+        let rule = |from: &str, to: &str| Replacement {
+            from: from.into(),
+            to: to.into(),
+        };
+        let r = vec![
+            rule("new", "NEW"),
+            rule(
+                "new line", "
+",
+            ),
+        ];
+        assert_eq!(
+            clean("a new line new", Level::Off, "en", &r),
+            "a 
+ NEW"
+        );
+        // One rule's output isn't replaced again by the next.
+        let r = vec![rule("a", "b"), rule("b", "c")];
+        assert_eq!(clean("a b", Level::Off, "en", &r), "b c");
+    }
+
+    #[test]
+    fn german_nouns_are_capitalized() {
+        assert!(capitalizes_nouns("de"));
+        assert!(capitalizes_nouns("DE-at"));
+        assert!(!capitalizes_nouns("en"));
+        assert!(!capitalizes_nouns("auto"));
     }
 
     #[test]

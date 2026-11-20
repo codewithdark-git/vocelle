@@ -1155,6 +1155,18 @@ input[role="switch"]:checked::after {
   accent-color: var(--accent);
 }
 
+/* Progress bar with a Cancel button beside it. */
+.model-action.downloading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.model-action.downloading button {
+  padding: 4px 8px;
+}
+
 .model-state {
   display: inline-flex;
   align-items: center;
@@ -1253,6 +1265,31 @@ input[role="switch"]:checked::after {
   margin-top: 2px;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+/* Something failed: the talk key, or the last dictation. */
+.alert-notice {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.alert-notice b {
+  color: var(--danger);
+}
+
+.notice .problem-message {
+  color: var(--fg);
+}
+
+.notice-time {
+  margin-left: var(--space-1);
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.notice-detail:empty {
+  display: none;
 }
 
 .stats {

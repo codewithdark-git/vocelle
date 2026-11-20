@@ -117,7 +117,11 @@ Vocelle keeps running in the system tray (the orange sound-wave icon). Click it 
 
 On the **General** tab, choose a key from the list or click **Press a key…** and press the one you want. The change applies immediately.
 
-Hold the key while you speak and release it when you're done. Pressing another key while holding it (for example Right Ctrl+C) cancels, so normal shortcuts keep working. A quick tap is ignored, and recordings stop on their own after 5 minutes.
+Hold the key while you speak and release it when you're done. Pressing another key while holding it (for example Right Ctrl+C) cancels, so normal shortcuts keep working. A quick tap is ignored. Recordings stop on their own after 5 minutes, in case the key got stuck; that text is copied rather than typed, so press Ctrl+V to paste it.
+
+### When text can't be typed
+
+If Vocelle can't type into the app you're in (for example one run as administrator), your text is copied instead and the indicator says so: click where you want it and press Ctrl+V. **Paste last dictation** in the tray menu copies your last dictation again (or pastes it, when another app has focus). Home keeps the last problem, with what to do about it, until you dismiss it.
 
 Keys you can use: Right Ctrl, Left Ctrl, Right Shift, Caps Lock, Scroll Lock, Pause, Insert and F1–F12 (plus Menu and F13–F24 on Windows). Letters, digits and Space can't be used, because holding them would type characters. On Windows, a non-modifier talk key such as Caps Lock is reserved for Vocelle, so it won't also toggle caps.
 
@@ -130,6 +134,8 @@ On the **Text** tab:
 | Off | Inserts exactly what the model heard | um so i think the the plan works, uh, for friday |
 | Light (default) | Removes "um", "uh" and similar; fixes spacing; capitalizes the first letter | So i think the the plan works for friday |
 | Full | Light, plus stutters, sentence capitals and a lone "i" | So I think the plan works for friday |
+
+Filler words are removed in English, German, French, Dutch and Italian, using only sounds that are never real words in that language (German "um" stays, for example). With automatic detection, the language Whisper heard is used. In other languages, cleanup only fixes spacing, capitals and stutters, so no real word is deleted. Full leaves web addresses, file names and numbers such as "example.com" or "3.5" alone.
 
 Type in **Try it** to preview any level. Vocelle also adds a space after each dictation so back-to-back dictations don't run together; you can turn that off.
 
@@ -153,7 +159,7 @@ Type in **Try it** to preview any level. Vocelle also adds a space after each di
 | Small (multilingual) | 190 MB | 99 languages | Like Small, for other languages |
 | Large Turbo | 574 MB | 99 languages | Best accuracy; 8+ core CPU |
 
-English-only models are faster and more accurate for English, and always transcribe English. You can download several and switch with **Use** on the Models tab.
+English-only models are faster and more accurate for English, and always transcribe English. You can download several and switch with **Use** on the Models tab. **Cancel** stops a download; the next Download continues where it stopped.
 
 ## Configuration
 
@@ -197,7 +203,9 @@ Everything is set in the app, which saves automatically. The files live here:
 | `history` | `true`, `false` | `true` |
 | `onboarded` | `true` once the welcome setup is finished or skipped | `false` |
 
-Missing keys get their defaults, so older settings files keep working. Edit the file only while Vocelle is closed; it's read at start-up.
+Missing keys get their defaults, so older settings files keep working, and a key with a bad value gets its default without affecting the others. Edit the file only while Vocelle is closed; it's read at start-up.
+
+Each save keeps the previous version as `settings.json.bak` (the same for `history.json` and `stats.json`). If a file is damaged, Vocelle keeps it as `<name>.corrupt-<time>` and uses the backup.
 </details>
 
 ## Privacy
@@ -253,9 +261,9 @@ Add it to the **Dictionary** on the Text tab. If it still comes out wrong, add a
 </details>
 
 <details>
-<summary><b>Vocelle closes when loading a model or dictating</b></summary>
+<summary><b>"This CPU isn't supported yet (needs AVX2)"</b></summary>
 
-Your CPU may not support AVX2 (see [System requirements](#system-requirements)). Support for older CPUs is planned.
+Your CPU doesn't support AVX2 (see [System requirements](#system-requirements)). Support for older CPUs is planned.
 </details>
 
 <details>

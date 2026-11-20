@@ -3,7 +3,10 @@
 //!
 //! Every clipboard format (text, formatting, images, files) is copied before
 //! pasting and put back afterwards, so whatever the user had copied survives.
-//! The dictation itself is kept out of clipboard history and cloud sync.
+//! It's put back only while the clipboard's sequence number is the one it got
+//! when the dictation was placed there; a change means something else was
+//! copied since. The dictation itself is kept out of clipboard history and
+//! cloud sync.
 
 use std::{mem::size_of, ptr, thread, time::Duration};
 
@@ -13,12 +16,13 @@ use windows::Win32::{
     Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
     System::{
         DataExchange::{
-            CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData, OpenClipboard,
-            SetClipboardData,
+            CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
+            GetClipboardSequenceNumber, OpenClipboard, SetClipboardData,
         },
         Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE},
         Threading::{
-            GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+            GetCurrentProcess, GetCurrentProcessId, OpenProcess, OpenProcessToken,
+            PROCESS_QUERY_LIMITED_INFORMATION,
         },
     },
     UI::{
@@ -26,11 +30,12 @@ use windows::Win32::{
             SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
             KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_RETURN, VK_V,
         },
-        WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
+        WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowThreadProcessId},
     },
 };
 
-use super::{InsertError, RESTORE_DELAY};
+use super::InsertError;
+use crate::log::log;
 
 /// Clipboard formats whose data is a GDI or private handle rather than memory,
 /// so it can't be copied byte for byte. Windows re-creates the common ones
@@ -52,12 +57,56 @@ pub fn check_target() -> Result<(), InsertError> {
     Ok(())
 }
 
-pub fn insert(text: &str) -> Result<(), InsertError> {
-    let Some(snapshot) = Snapshot::take() else {
-        // The clipboard is busy or too big to copy; typing leaves it untouched.
-        return type_text(text);
+/// The user's clipboard, and the clipboard sequence number right after the
+/// dictation replaced it.
+pub struct Saved {
+    snapshot: Snapshot,
+    sequence: u32,
+}
+
+/// Pastes `text`. `saved` is a restore still waiting from the previous
+/// dictation, if any; on return it's the restore to schedule, if any.
+pub fn insert(text: &str, saved: &mut Option<Saved>) -> Result<(), InsertError> {
+    let snapshot = match saved.take() {
+        // The clipboard still holds the previous dictation, so the user's
+        // clipboard saved before that is the one to put back.
+        Some(previous) if clipboard_sequence() == previous.sequence => previous.snapshot,
+        // Something else was copied since; that's the user's clipboard now.
+        _ => match Snapshot::take() {
+            Some(snapshot) => snapshot,
+            // The clipboard is busy or too big to copy; typing leaves it untouched.
+            None => return type_text(text),
+        },
     };
 
+    if let Err(err) = copy(text) {
+        // The copy may have emptied the clipboard; put the user's back.
+        *saved = Some(Saved {
+            snapshot,
+            sequence: clipboard_sequence(),
+        });
+        return Err(err);
+    }
+    let sequence = clipboard_sequence();
+    // Only after a paste: when Ctrl+V couldn't be sent, the dictation stays on
+    // the clipboard so the user can still paste it.
+    send_paste()?;
+    *saved = Some(Saved { snapshot, sequence });
+    Ok(())
+}
+
+/// Puts the user's clipboard back, unless something was copied after the
+/// dictation.
+pub fn restore(saved: Saved) {
+    saved.snapshot.restore(saved.sequence);
+}
+
+fn clipboard_sequence() -> u32 {
+    unsafe { GetClipboardSequenceNumber() }
+}
+
+/// Puts `text` on the clipboard, kept out of clipboard history and cloud sync.
+pub fn copy(text: &str) -> Result<(), InsertError> {
     let mut clipboard =
         arboard::Clipboard::new().map_err(|e| InsertError::Clipboard(e.to_string()))?;
     clipboard
@@ -65,12 +114,43 @@ pub fn insert(text: &str) -> Result<(), InsertError> {
         .exclude_from_history()
         .exclude_from_cloud()
         .text(text)
-        .map_err(|e| InsertError::Clipboard(e.to_string()))?;
-    let sent = send_paste();
+        .map_err(|e| InsertError::Clipboard(e.to_string()))
+}
 
-    thread::sleep(RESTORE_DELAY);
-    snapshot.restore();
-    sent
+/// Puts `text` on the clipboard like any copy, clipboard history included.
+pub fn copy_plain(text: &str) -> Result<(), InsertError> {
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.set_text(text))
+        .map_err(|e| InsertError::Clipboard(e.to_string()))
+}
+
+/// Windows of the taskbar and its notification area. Clicking the tray icon
+/// can leave one of these focused, and a paste there goes nowhere.
+fn is_shell_window(class: &str) -> bool {
+    matches!(
+        class,
+        "Shell_TrayWnd"
+            | "Shell_SecondaryTrayWnd"
+            | "NotifyIconOverflowWindow"
+            | "TopLevelWindowForOverflowXamlIsland"
+    )
+}
+
+pub fn focus_is_elsewhere() -> bool {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_invalid() {
+            return false;
+        }
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 || pid == GetCurrentProcessId() {
+            return false;
+        }
+        let mut class = [0u16; 128];
+        let len = GetClassNameW(hwnd, &mut class).clamp(0, class.len() as i32) as usize;
+        !is_shell_window(&String::from_utf16_lossy(&class[..len]))
+    }
 }
 
 /// A copy of every memory-backed clipboard format.
@@ -124,10 +204,17 @@ impl Snapshot {
         Some(Self(formats))
     }
 
-    fn restore(self) {
+    /// Writes the snapshot back if the clipboard sequence number is still
+    /// `sequence`. Checked with the clipboard open, so nothing can be copied
+    /// in between.
+    fn restore(self, sequence: u32) {
         let Some(_open) = OpenClipboardGuard::open() else {
             return;
         };
+        if clipboard_sequence() != sequence {
+            log!("clipboard changed after the paste, so it was left as is");
+            return;
+        }
         unsafe {
             let _ = EmptyClipboard();
             for (format, bytes) in self.0 {
@@ -276,5 +363,18 @@ fn process_is_elevated(process: HANDLE) -> bool {
         .is_ok();
         let _ = CloseHandle(token);
         ok && elevation.TokenIsElevated != 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn taskbar_windows_are_not_paste_targets() {
+        assert!(is_shell_window("Shell_TrayWnd"));
+        assert!(is_shell_window("NotifyIconOverflowWindow"));
+        assert!(!is_shell_window("Notepad"));
+        assert!(!is_shell_window("Chrome_WidgetWin_1"));
     }
 }

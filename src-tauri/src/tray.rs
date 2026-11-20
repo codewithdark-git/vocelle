@@ -4,15 +4,28 @@ use tauri::{
     AppHandle,
 };
 
+const MENU_PASTE_LAST: &str = "paste-last";
 const MENU_SETTINGS: &str = "settings";
 const MENU_QUIT: &str = "quit";
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
+    let paste_last = MenuItem::with_id(
+        app,
+        MENU_PASTE_LAST,
+        "Paste last dictation",
+        true,
+        None::<&str>,
+    )?;
     let settings = MenuItem::with_id(app, MENU_SETTINGS, "Settings", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Vocelle", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
-        &[&settings, &PredefinedMenuItem::separator(app)?, &quit],
+        &[
+            &paste_last,
+            &settings,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
     )?;
 
     let mut builder = TrayIconBuilder::with_id("main")
@@ -20,6 +33,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
+            // Clicking the menu takes focus from the app the user was in, so
+            // this usually copies the text and asks for Ctrl+V.
+            MENU_PASTE_LAST => crate::dictation::paste_last(app),
             MENU_SETTINGS => crate::show_main_window(app),
             MENU_QUIT => app.exit(0),
             _ => {}

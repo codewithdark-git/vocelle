@@ -1,19 +1,56 @@
 //! Settings-window commands for speech models, and loading the chosen model.
 
-use std::{collections::HashSet, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, TryLockError,
+    },
+};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::{
-    asr::Engine,
-    models::{self, ModelInfo},
+    asr::{Engine, Ticket},
+    log::log,
+    models::{self, DownloadError, ModelInfo},
+    problem,
     settings::Store,
 };
 
-/// Model ids currently downloading, so a double click doesn't start two downloads.
+/// Held while a model is saved as the active one and its load request starts,
+/// so the latest load request is always for the model in Settings.
+static SELECT: Mutex<()> = Mutex::new(());
+
+/// Model ids currently downloading, each with its cancel flag, so a double
+/// click doesn't start two downloads. An id leaves the map whenever its
+/// download thread ends, however it ends, so Download always works again.
 #[derive(Default)]
-pub struct Downloads(Mutex<HashSet<&'static str>>);
+pub struct Downloads(Mutex<HashMap<&'static str, Arc<AtomicBool>>>);
+
+impl Downloads {
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<&'static str, Arc<AtomicBool>>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+/// Removes a download's id from [`Downloads`] when its thread ends, even if
+/// it panics.
+struct Entry {
+    app: AppHandle,
+    id: &'static str,
+    removed: bool,
+}
+
+impl Drop for Entry {
+    fn drop(&mut self) {
+        if !self.removed {
+            self.app.state::<Downloads>().lock().remove(self.id);
+        }
+    }
+}
 
 #[derive(Serialize)]
 pub struct ModelStatus {
@@ -34,6 +71,14 @@ struct Progress {
 }
 
 #[derive(Clone, Serialize)]
+struct DownloadEvent {
+    id: &'static str,
+    error: Option<String>,
+    /// The user cancelled it, so there is no error to show.
+    cancelled: bool,
+}
+
+#[derive(Clone, Serialize)]
 struct ModelEvent {
     id: &'static str,
     error: Option<String>,
@@ -50,8 +95,9 @@ fn find(id: &str) -> Result<&'static ModelInfo, String> {
     models::find(id).ok_or_else(|| format!("Unknown model: {id}"))
 }
 
+/// Async, so it runs off the main thread.
 #[tauri::command]
-pub fn list_models(
+pub async fn list_models(
     app: AppHandle,
     engine: State<'_, Engine>,
     downloads: State<'_, Downloads>,
@@ -59,14 +105,14 @@ pub fn list_models(
     let dir = models_dir(&app)?;
     let selected = app.state::<Store>().get().model;
     let loaded = engine.loaded_model();
-    let downloading = downloads.0.lock().unwrap();
+    let downloading = downloads.lock();
     let recommended = models::recommended().id;
     Ok(models::CATALOG
         .iter()
         .map(|m| ModelStatus {
             info: *m,
             downloaded: models::is_downloaded(&dir, m),
-            downloading: downloading.contains(m.id),
+            downloading: downloading.contains_key(m.id),
             selected: selected.as_deref() == Some(m.id),
             loaded: loaded == Some(m.id),
             recommended: m.id == recommended,
@@ -84,38 +130,104 @@ pub fn download_model(
 ) -> Result<(), String> {
     let model = find(&id)?;
     let dir = models_dir(&app)?;
-    if !downloads.0.lock().unwrap().insert(model.id) {
-        return Ok(());
-    }
+    let cancel = {
+        let mut map = downloads.lock();
+        if let Some(cancel) = map.get(model.id) {
+            // Already running, or cancelled but not stopped yet (a stalled
+            // read can take a while to notice): carry on with that one.
+            cancel.store(false, Ordering::Relaxed);
+            return Ok(());
+        }
+        let cancel = Arc::new(AtomicBool::new(false));
+        map.insert(model.id, cancel.clone());
+        cancel
+    };
     std::thread::spawn(move || {
-        let result = models::download(&dir, &models::VAD, |_, _| {}).and_then(|_| {
-            models::download(&dir, model, |done, total| {
-                let _ = app.emit(
-                    "model-progress",
-                    Progress {
-                        id: model.id,
-                        done,
-                        total,
-                    },
-                );
-            })
-        });
-        app.state::<Downloads>().0.lock().unwrap().remove(model.id);
+        let mut entry = Entry {
+            app: app.clone(),
+            id: model.id,
+            removed: false,
+        };
+        let result = loop {
+            let result = fetch(&app, &dir, model, &cancel);
+            let downloads = app.state::<Downloads>();
+            let mut map = downloads.lock();
+            // Download was clicked again while this one was stopping.
+            if result == Err(DownloadError::Cancelled) && !cancel.load(Ordering::Relaxed) {
+                drop(map);
+                continue;
+            }
+            map.remove(model.id);
+            entry.removed = true;
+            break result;
+        };
 
-        let error = result.err();
+        let (error, cancelled) = match result {
+            Ok(_) => (None, false),
+            Err(DownloadError::Cancelled) => (None, true),
+            Err(DownloadError::Failed(error)) => (Some(error), false),
+        };
         // The first model downloaded becomes the active one.
-        if error.is_none() && app.state::<Store>().get().model.is_none() {
+        if error.is_none() && !cancelled && app.state::<Store>().get().model.is_none() {
             let _ = select(&app, model);
         }
         let _ = app.emit(
             "model-downloaded",
-            ModelEvent {
+            DownloadEvent {
                 id: model.id,
                 error,
+                cancelled,
             },
         );
     });
     Ok(())
+}
+
+/// Downloads `model`, then the VAD model. The VAD model is best-effort: the
+/// engine works without it (it only skips silence), so its failure is logged
+/// and never blocks the speech model. It is tried again with the next download.
+fn fetch(
+    app: &AppHandle,
+    dir: &Path,
+    model: &'static ModelInfo,
+    cancel: &AtomicBool,
+) -> Result<PathBuf, DownloadError> {
+    let path = models::download(dir, model, cancel, |done, total| {
+        let _ = app.emit(
+            "model-progress",
+            Progress {
+                id: model.id,
+                done,
+                total,
+            },
+        );
+    })?;
+    // Two model downloads can finish together; only one fetches the VAD
+    // model, so they never write the same partial file. The other skips it.
+    static VAD_FETCH: Mutex<()> = Mutex::new(());
+    let fetching = match VAD_FETCH.try_lock() {
+        Ok(guard) => Some(guard),
+        Err(TryLockError::Poisoned(e)) => Some(e.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    };
+    if fetching.is_some() {
+        match models::download(dir, &models::VAD, cancel, |_, _| {}) {
+            Ok(_) | Err(DownloadError::Cancelled) => {}
+            Err(DownloadError::Failed(error)) => {
+                log!("couldn't download the VAD model, continuing without it: {error}");
+            }
+        }
+    }
+    Ok(path)
+}
+
+/// Stops a running download soon. Its `model-downloaded` event then has
+/// `cancelled: true`. The partial file is kept, so Download resumes it.
+#[tauri::command]
+pub fn cancel_download(downloads: State<'_, Downloads>, id: String) {
+    if let Some(cancel) = downloads.lock().get(id.as_str()) {
+        cancel.store(true, Ordering::Relaxed);
+    }
 }
 
 #[tauri::command]
@@ -125,9 +237,11 @@ pub fn select_model(app: AppHandle, id: String) -> Result<(), String> {
 
 /// Saves `model` as the active model and loads it in the background.
 fn select(app: &AppHandle, model: &'static ModelInfo) -> Result<(), String> {
+    let _select = SELECT.lock().unwrap_or_else(|e| e.into_inner());
     app.state::<Store>()
         .update(app, |s| s.model = Some(model.id.to_owned()))?;
-    load_in_background(app.clone(), model);
+    let ticket = app.state::<Engine>().begin_load(model.id);
+    load_in_background(app.clone(), model, ticket);
     Ok(())
 }
 
@@ -141,25 +255,40 @@ pub fn load_selected(app: &AppHandle) {
     else {
         return;
     };
-    load_in_background(app.clone(), model);
+    let ticket = app.state::<Engine>().begin_load(model.id);
+    load_in_background(app.clone(), model, ticket);
 }
 
-fn load_in_background(app: AppHandle, model: &'static ModelInfo) {
+/// Loads `model` for `ticket`. Only the latest request changes the model;
+/// an older one that finishes later is dropped quietly.
+fn load_in_background(app: AppHandle, model: &'static ModelInfo, ticket: Ticket) {
     std::thread::spawn(move || {
-        let error = models_dir(&app).and_then(|dir| {
+        let engine = app.state::<Engine>();
+        let files = models_dir(&app).and_then(|dir| {
             if !models::is_downloaded(&dir, model) {
-                return Err(format!("{} isn't downloaded yet", model.name));
+                return Err(format!(
+                    "The {} model isn't downloaded yet. Download it in Vocelle settings.",
+                    model.name
+                ));
             }
-            let vad = models::path(&dir, &models::VAD);
-            let vad = models::is_downloaded(&dir, &models::VAD).then_some(vad.as_path());
-            app.state::<Engine>()
-                .load(model, &models::path(&dir, model), vad)
+            let vad =
+                models::is_downloaded(&dir, &models::VAD).then(|| models::path(&dir, &models::VAD));
+            Ok((models::path(&dir, model), vad))
         });
+        let result = match files {
+            Ok((path, vad)) => engine.load(ticket, model, &path, vad.as_deref()),
+            Err(error) => engine.fail_load(ticket, error),
+        };
+        let error = result.err();
+        if let Some(error) = &error {
+            log!("couldn't load {}: {error}", model.id);
+            problem::report(&app, error);
+        }
         let _ = app.emit(
             "model-loaded",
             ModelEvent {
                 id: model.id,
-                error: error.err(),
+                error,
             },
         );
     });

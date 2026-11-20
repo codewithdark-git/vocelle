@@ -44,6 +44,8 @@ export interface AppInfo {
   name: string;
   version: string;
   platform: string;
+  /** A Linux Wayland session, where the talk key can't be heard yet. */
+  wayland: boolean;
 }
 
 export interface ModelStatus {
@@ -59,6 +61,14 @@ export interface ModelStatus {
   recommended: boolean;
 }
 
+/** A failure shown on the Home "Last problem" card. */
+export interface Problem {
+  message: string;
+  hint: string;
+  /** Milliseconds since 1970. */
+  time: number;
+}
+
 export interface HistoryEntry {
   at: number;
   text: string;
@@ -71,12 +81,13 @@ export const api = {
   choices: () => invoke<Choices>("settings_choices"),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
-  previewCleanup: (text: string, level: CleanupLevel, replacements: Replacement[]) =>
-    invoke<string>("preview_cleanup", { text, level, replacements }),
+  previewCleanup: (text: string, level: CleanupLevel, language: string, replacements: Replacement[]) =>
+    invoke<string>("preview_cleanup", { text, level, language, replacements }),
   getAutostart: () => invoke<boolean>("get_autostart"),
   setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
   listModels: () => invoke<ModelStatus[]>("list_models"),
   downloadModel: (id: string) => invoke<void>("download_model", { id }),
+  cancelDownload: (id: string) => invoke<void>("cancel_download", { id }),
   selectModel: (id: string) => invoke<void>("select_model", { id }),
   listHistory: () => invoke<HistoryEntry[]>("list_history"),
   deleteHistoryEntry: (at: number) => invoke<void>("delete_history_entry", { at }),
@@ -85,6 +96,9 @@ export const api = {
   getStats: () => invoke<Stats>("get_stats"),
   testMicrophone: (microphone: string | null) => invoke<number>("test_microphone", { microphone }),
   openSupportPage: () => invoke<void>("open_support_page"),
+  talkKeyProblem: () => invoke<string | null>("talk_key_problem"),
+  lastProblem: () => invoke<Problem | null>("last_problem"),
+  dismissProblem: () => invoke<void>("dismiss_problem"),
 };
 
 const errorBox = () => document.getElementById("error")!;

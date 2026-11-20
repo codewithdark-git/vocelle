@@ -1,15 +1,18 @@
 //! Commands the Settings window calls (speech-model commands live in `speech.rs`).
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::{
+    asr::Engine,
     audio::{self, Recording},
     cleanup::{self, Replacement},
+    dictation,
     history::{Entry, History, Stats},
-    hotkey,
+    hotkey, insert,
     keys::TalkKey,
+    models,
     settings::{Settings, Store, LANGUAGES},
 };
 
@@ -18,6 +21,8 @@ pub struct AppInfo {
     name: String,
     version: String,
     platform: &'static str,
+    /// A Wayland session, where the talk key can't be heard yet.
+    wayland: bool,
 }
 
 #[tauri::command]
@@ -27,6 +32,28 @@ pub fn app_info(app: AppHandle) -> AppInfo {
         name: pkg.name.clone(),
         version: pkg.version.to_string(),
         platform: std::env::consts::OS,
+        wayland: wayland_session(),
+    }
+}
+
+/// Whether this is a Linux Wayland session. The talk key listens through
+/// X11, which Wayland apps don't share key presses with.
+pub fn wayland_session() -> bool {
+    let var = |name| std::env::var(name).ok();
+    cfg!(target_os = "linux")
+        && is_wayland(
+            var("XDG_SESSION_TYPE").as_deref(),
+            var("WAYLAND_DISPLAY").as_deref(),
+        )
+}
+
+/// XDG_SESSION_TYPE decides when it's set; otherwise a WAYLAND_DISPLAY means
+/// Wayland.
+fn is_wayland(session_type: Option<&str>, wayland_display: Option<&str>) -> bool {
+    match session_type.map(str::trim) {
+        Some(kind) if kind.eq_ignore_ascii_case("wayland") => true,
+        Some(kind) if !kind.is_empty() && !kind.eq_ignore_ascii_case("tty") => false,
+        _ => wayland_display.is_some_and(|d| !d.trim().is_empty()),
     }
 }
 
@@ -44,8 +71,9 @@ pub struct Language {
     name: &'static str,
 }
 
+/// Async, so listing microphones runs off the main thread.
 #[tauri::command]
-pub fn settings_choices() -> Choices {
+pub async fn settings_choices() -> Choices {
     Choices {
         talk_keys: hotkey::available_keys(),
         languages: LANGUAGES
@@ -70,10 +98,6 @@ pub fn save_settings(
     settings: Settings,
 ) -> Result<Settings, String> {
     let current = store.get();
-    let settings = Settings {
-        model: current.model,
-        ..settings
-    };
     if settings.talk_key != current.talk_key {
         hotkey::set_talk_key(&settings.talk_key)?;
     }
@@ -87,14 +111,37 @@ pub fn save_settings(
     }
 }
 
-/// Runs text cleanup on sample text so the Text page can preview a level.
+/// Runs text cleanup on sample text so the Text page can preview a level,
+/// with the rules for the language set in Settings.
 #[tauri::command]
 pub fn preview_cleanup(
+    engine: State<'_, Engine>,
     text: String,
     level: cleanup::Level,
+    language: String,
     replacements: Vec<Replacement>,
 ) -> String {
-    cleanup::clean(&text, level, &replacements)
+    let english_only = engine
+        .loaded_model()
+        .and_then(models::find)
+        .is_some_and(|m| m.english_only);
+    cleanup::clean(
+        &text,
+        level,
+        preview_language(&language, english_only),
+        &replacements,
+    )
+}
+
+/// The language a preview is cleaned as. With "auto", Whisper picks the
+/// language from the speech; the sample is typed, not spoken, and it's
+/// English, so it's previewed as English.
+fn preview_language(setting: &str, english_only: bool) -> &str {
+    match setting {
+        _ if english_only => "en",
+        "" | "auto" => "en",
+        code => code,
+    }
 }
 
 #[tauri::command]
@@ -113,9 +160,10 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     result.map_err(|e| format!("Couldn't change start-up setting: {e}"))
 }
 
+/// Async, so reading the history file runs off the main thread.
 #[tauri::command]
-pub fn list_history(app: AppHandle, history: State<'_, History>) -> Vec<Entry> {
-    history.list(&app)
+pub async fn list_history(app: AppHandle) -> Vec<Entry> {
+    app.state::<History>().list(&app)
 }
 
 #[tauri::command]
@@ -124,15 +172,27 @@ pub fn delete_history_entry(app: AppHandle, history: State<'_, History>, at: u64
 }
 
 #[tauri::command]
-pub fn clear_history(app: AppHandle, history: State<'_, History>) {
+pub fn clear_history(
+    app: AppHandle,
+    history: State<'_, History>,
+    shared: State<'_, dictation::Shared>,
+) {
     history.clear(&app);
+    // "Paste last dictation" shouldn't bring back text the user just cleared.
+    shared.forget();
 }
 
+/// Pastes the last dictation, or copies it when Vocelle's own window has focus
+/// (as it does when this is called from the Settings window).
 #[tauri::command]
+pub fn paste_last(app: AppHandle) {
+    dictation::paste_last(&app);
+}
+
+/// Off the main thread: it can wait a moment for the last paste.
+#[tauri::command(async)]
 pub fn copy_text(text: String) -> Result<(), String> {
-    arboard::Clipboard::new()
-        .and_then(|mut c| c.set_text(text))
-        .map_err(|e| format!("Couldn't copy: {e}"))
+    insert::copy_for_user(&text).map_err(|e| format!("Couldn't copy: {e}"))
 }
 
 /// The studio's support page, opened at its contribution section.
@@ -168,6 +228,12 @@ pub fn get_stats(app: AppHandle, history: State<'_, History>) -> Stats {
     history.stats(&app)
 }
 
+/// Why the talk key isn't working (its listener couldn't start), or `None`.
+#[tauri::command]
+pub fn talk_key_problem() -> Option<String> {
+    hotkey::failure()
+}
+
 /// Listens to `microphone` for two seconds and returns the loudest level heard
 /// (0.0–1.0), so the welcome setup can show whether the microphone works.
 #[tauri::command(async)]
@@ -180,4 +246,29 @@ pub fn test_microphone(microphone: Option<String>) -> Result<f32, String> {
         peak = peak.max(rec.level());
     }
     Ok(peak)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preview_uses_the_language_setting() {
+        assert_eq!(preview_language("de", false), "de");
+        assert_eq!(preview_language("auto", false), "en");
+        assert_eq!(preview_language("de", true), "en");
+    }
+
+    #[test]
+    fn wayland_is_detected_from_the_session() {
+        assert!(is_wayland(Some("wayland"), None));
+        assert!(is_wayland(Some("Wayland"), Some("wayland-0")));
+        assert!(!is_wayland(Some("x11"), None));
+        // An X11 session that happens to run a nested Wayland compositor.
+        assert!(!is_wayland(Some("x11"), Some("wayland-1")));
+        assert!(is_wayland(None, Some("wayland-0")));
+        assert!(is_wayland(Some("tty"), Some("wayland-0")));
+        assert!(!is_wayland(None, Some("")));
+        assert!(!is_wayland(None, None));
+    }
 }

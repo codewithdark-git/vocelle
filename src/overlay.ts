@@ -1,18 +1,22 @@
 import { listen } from "@tauri-apps/api/event";
 
-type Phase = "listening" | "transcribing" | "done" | "empty" | "error";
+type Phase = "listening" | "transcribing" | "loading" | "done" | "empty" | "copied" | "error";
 
 interface Status {
   phase: Phase;
   message: string | null;
+  /** A short form of the message that fits on the pill (errors, "copied" and "loading" only). */
+  label: string | null;
 }
 
 // Screen readers still get a name for each phase, even though nothing is written on screen.
 const NAMES: Record<Phase, string> = {
   listening: "Listening",
   transcribing: "Transcribing",
+  loading: "Loading the speech model",
   done: "Done",
   empty: "No speech heard",
+  copied: "Copied",
   error: "Something went wrong",
 };
 
@@ -22,6 +26,7 @@ const MIN_HEIGHT = 4;
 const MAX_HEIGHT = 22;
 
 const pill = document.getElementById("pill")!;
+const reason = document.getElementById("reason")!;
 const bars = Array.from(document.querySelectorAll<HTMLSpanElement>(".bars span"));
 
 // The backend sends the level every 50 ms. Easing towards it, with a little
@@ -40,9 +45,13 @@ function animate(time: number): void {
   frame = requestAnimationFrame(animate);
 }
 
-function setPhase(phase: Phase, message: string | null): void {
+function setPhase(phase: Phase, message: string | null, label: string | null = null): void {
   pill.dataset.phase = phase;
   pill.setAttribute("aria-label", message ?? NAMES[phase]);
+  // The backend widens the window before a reason arrives.
+  const showReason = (phase === "error" || phase === "copied" || phase === "loading") && !!label;
+  reason.textContent = showReason ? label : "";
+  pill.classList.toggle("with-reason", showReason);
   cancelAnimationFrame(frame);
   if (phase === "listening") {
     target = level = 0;
@@ -54,7 +63,7 @@ function setPhase(phase: Phase, message: string | null): void {
   pill.classList.add("enter");
 }
 
-void listen<Status>("overlay-status", ({ payload }) => setPhase(payload.phase, payload.message));
+void listen<Status>("overlay-status", ({ payload }) => setPhase(payload.phase, payload.message, payload.label));
 // Speech levels are small numbers; a square root makes quiet voices visible.
 void listen<number>("overlay-level", ({ payload }) => (target = Math.min(1, Math.sqrt(payload) * 1.4)));
 
