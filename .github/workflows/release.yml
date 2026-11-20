@@ -116,8 +116,12 @@ jobs:
           # whisper-rs-sys builds with CMake in very verbose mode, so Cargo's
           # saved build-script output lists every compiler call with its flags.
           # MSBuild writes -O2 as /O2; an unoptimized build shows /Od.
-          build=src-tauri/target/release/build
-          calls=$(cat $build/whisper-rs-sys-*/output 2>/dev/null | grep 'CL.exe /c' || true)
+          # Where Cargo keeps it depends on the Cargo version (Rust 1.100 moved
+          # build scripts from build/<crate>-<hash>/ to a new layout), so search.
+          build=src-tauri/target
+          outputs=$(find "$build" -path '*release*' -path '*whisper-rs-sys*' -name output -type f)
+          echo "build output files: ${outputs:-none}"
+          calls=$(echo "$outputs" | xargs -r cat | grep 'CL.exe /c' || true)
           if [ -n "$calls" ]; then
             total=$(echo "$calls" | wc -l)
             optimized=$(echo "$calls" | grep -c ' /O2 ' || true)
@@ -130,10 +134,10 @@ jobs:
             exit 0
           fi
           # No compiler calls recorded: fall back to CMake's own cache.
-          cache=$(find "$build" -path '*whisper-rs-sys-*' -name CMakeCache.txt | head -1)
+          cache=$(find "$build" -path '*release*' -path '*whisper*' -name CMakeCache.txt | head -1)
           if [ -z "$cache" ]; then
             echo "::error::Couldn't find whisper.cpp's build output to check its optimization"
-            ls -la $build/whisper-rs-sys-*/ $build/whisper-rs-sys-*/out 2>&1 || true
+            find "$build" -maxdepth 5 -ipath '*whisper*' | head -40
             exit 1
           fi
           grep -E "^CMAKE_CXX_FLAGS_RELEASE:" "$cache"
